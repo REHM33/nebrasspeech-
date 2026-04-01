@@ -4,3 +4,5 @@ PyMySQL
 Werkzeug
 gunicorn
 flask-cors
+openai-whisper
+torch
