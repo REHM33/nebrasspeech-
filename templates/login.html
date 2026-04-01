@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nebras | Sign In</title>
+  <meta name="description" content="Sign in to Nebras." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container nav-container">
+    <div class="logo"><a href="/">Nebras</a></div>
+    <nav class="nav-links">
+      <a href="/">Home</a>
+      <a class="btn-primary" href="/register">Create Account</a>
+    </nav>
+  </div>
+</header>
+
+<main class="auth-page">
+  <div class="container auth-container">
+    <section class="auth-card">
+      <h1>Sign In</h1>
+      <p class="muted">Access your dashboard.</p>
+
+      <form id="loginForm" class="form" novalidate>
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" required minlength="3" autocomplete="username" />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required minlength="6" autocomplete="current-password" />
+        </div>
+
+        <button class="btn-primary full-width" type="submit">Sign In</button>
+      </form>
+
+      <div id="messageBox" class="message-box" role="status" aria-live="polite"></div>
+
+      <p class="muted">
+        No account? <a href="/register">Create one</a>
+      </p>
+    </section>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container footer-content">
+    <p>© <span id="year"></span> Nebras. All rights reserved.</p>
+  </div>
+</footer>
+
+<script src="js/main.js" defer></script>
+<script src="js/login.js" defer></script>
+</body>
+</html>

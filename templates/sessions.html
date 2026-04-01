@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nebras | Sessions</title>
+  <meta name="description" content="Manage your saved transcription sessions." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container nav-container">
+    <div class="logo"><a href="/dashboard">Nebras</a></div>
+    <nav class="nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/live-page">Live</a>
+      <a href="/upload-page">Upload</a>
+      <button id="logoutBtn" class="btn-outline" type="button">Logout</button>
+    </nav>
+  </div>
+</header>
+
+<main class="sessions-page">
+  <div class="container">
+
+    <section class="page-header">
+      <h1>Sessions</h1>
+      <p class="muted">Open, edit, update, and delete your saved sessions.</p>
+    </section>
+
+    <section class="sessions-layout">
+
+      <!-- LEFT: List -->
+      <div class="sessions-list-panel">
+        <div class="panel-header">
+          <h2>Your Sessions</h2>
+          <button id="refreshBtn" class="btn-outline" type="button">Refresh</button>
+        </div>
+
+        <div class="controls">
+          <input id="filterInput" class="input" type="text" placeholder="Filter by title..." />
+          <button id="clearFilterBtn" class="btn-outline" type="button">Clear</button>
+        </div>
+
+        <ul id="sessionsList" class="sessions-list" aria-label="Sessions list"></ul>
+
+        <div id="listMessageBox" class="message-box" role="status" aria-live="polite"></div>
+      </div>
+
+      <!-- RIGHT: Viewer/Editor -->
+      <div class="session-viewer-panel">
+        <div class="panel-header">
+          <h2>Session Editor</h2>
+          <span class="muted" id="activeSessionMeta"></span>
+        </div>
+
+        <div class="controls">
+          <input id="sessionTitleInput" class="input" type="text" placeholder="Session title" />
+          <button id="updateSessionBtn" class="btn-primary" type="button" disabled>Update</button>
+          <button id="exportTxtBtn" class="btn-outline" type="button" disabled>Export TXT</button>
+        </div>
+
+        <div class="controls">
+          <button id="fontMinusBtn" class="btn-outline" type="button">A-</button>
+          <button id="fontPlusBtn" class="btn-outline" type="button">A+</button>
+
+          <label class="sr-only" for="fontFamilySelect">Font Family</label>
+          <select id="fontFamilySelect" class="select">
+            <option value="sans">Sans</option>
+            <option value="serif">Serif</option>
+            <option value="mono">Mono</option>
+          </select>
+
+          <button id="alignLeftBtn" class="btn-outline" type="button">Left</button>
+          <button id="alignCenterBtn" class="btn-outline" type="button">Center</button>
+          <button id="alignRightBtn" class="btn-outline" type="button">Right</button>
+
+          <button id="readingModeBtn" class="btn-outline" type="button">Reading Mode</button>
+        </div>
+
+        <div class="controls">
+          <label class="sr-only" for="highlightSelect">Highlight Color</label>
+          <select id="highlightSelect" class="select">
+            <option value="hl-yellow">Highlight Yellow</option>
+            <option value="hl-blue">Highlight Blue</option>
+            <option value="hl-green">Highlight Green</option>
+            <option value="hl-pink">Highlight Pink</option>
+          </select>
+          <button id="applyHighlightBtn" class="btn-outline" type="button">Apply Highlight</button>
+
+          <button id="cleanBtn" class="btn-outline" type="button">Clean Text</button>
+          <button id="copyBtn" class="btn-outline" type="button">Copy All</button>
+          <button id="clearTextBtn" class="btn-outline" type="button">Clear Text</button>
+        </div>
+
+        <div class="controls">
+          <label class="sr-only" for="findInput">Find</label>
+          <input id="findInput" class="input" type="text" placeholder="Find..." />
+          <button id="findBtn" class="btn-outline" type="button">Find</button><button id="findNextBtn" class="btn-outline" type="button">Find Next</button>
+          <button id="clearFindBtn" class="btn-outline" type="button">Clear Find</button>
+
+          <label class="sr-only" for="replaceInput">Replace With</label>
+          <input id="replaceInput" class="input" type="text" placeholder="Replace with..." />
+
+          <button id="replaceOneBtn" class="btn-outline" type="button">Replace One</button>
+          <button id="replaceAllBtn" class="btn-outline" type="button">Replace All</button>
+        </div>
+
+        <div class="transcript-box">
+          <label class="transcript-label" for="editor">Editor</label>
+          <div id="editor" class="rich-editor" contenteditable="true" spellcheck="false"></div>
+        </div>
+
+        <div class="controls">
+          <span class="muted" id="wordCount">Words: 0</span>
+          <span class="muted" id="charCount">Chars: 0</span>
+        </div>
+
+        <div id="viewerMessageBox" class="message-box" role="status" aria-live="polite"></div>
+      </div>
+
+    </section>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container footer-content">
+    <p>© <span id="year"></span> Nebras. All rights reserved.</p>
+  </div>
+</footer>
+
+<script src="js/main.js" defer></script>
+<script src="js/sessions.js" defer></script>
+</body>
+</html>
