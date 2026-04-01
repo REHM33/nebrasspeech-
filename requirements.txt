@@ -1,4 +1,6 @@
-flask 
-flask-sqlalchemy 
-pymysql 
-werkzeug
+Flask
+Flask-SQLAlchemy
+PyMySQL
+Werkzeug
+gunicorn
+flask-cors
