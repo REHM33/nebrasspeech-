@@ -4,17 +4,16 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 
-from database import db, Session, SessionFile, log_action
+from database import db, Session, SessionFile, log_action, init_db
 from auth import auth_bp
 from whisper_service import transcribe_audio
 
 app = Flask(__name__, static_folder="static", static_url_path="", template_folder="templates")
 CORS(app)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:@127.0.0.1/nebras_db?charset=utf8mb4"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# تم استبدال السطر اليدوي بالدالة الذكية للربط بالسيرفر
+init_db(app)
 
-db.init_app(app)
 app.register_blueprint(auth_bp)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -23,10 +22,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {"wav", "mp3", "ogg", "m4a", "webm", "flac"}
 
-
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
 
 def save_uploaded_file(file_storage):
     original_name = secure_filename(file_storage.filename or "audio")
@@ -45,7 +42,6 @@ def save_uploaded_file(file_storage):
         "mime_type": file_storage.mimetype,
         "size_bytes": os.path.getsize(stored_path)
     }
-
 
 def create_session_with_file(user_id, title, transcript, source_type, file_meta, language_code=None):
     session_row = Session(
@@ -80,45 +76,36 @@ def create_session_with_file(user_id, title, transcript, source_type, file_meta,
     )
     return session_row, file_row
 
-
 from auth import _get_user_from_auth_header
-
 
 def require_auth():
     return _get_user_from_auth_header()
-
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
-
 @app.route("/login")
 def login_page():
     return render_template("login.html")
-
 
 @app.route("/register")
 def register_page():
     return render_template("register.html")
 
-
 @app.route("/dashboard")
 def dashboard_page():
     return render_template("dashboard.html")
-
 
 @app.route("/live-page")
 @app.route("/live")
 def live_page():
     return render_template("live.html")
 
-
 @app.route("/upload-page")
 @app.route("/upload")
 def upload_page():
     return render_template("upload.html")
-
 
 @app.route("/sessions-page")
 @app.route("/sessions-view")
@@ -126,14 +113,12 @@ def upload_page():
 def sessions_page():
     return render_template("sessions.html")
 
-
 @app.route("/uploads/<path:filename>")
 def uploaded_audio(filename):
     user = require_auth()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
     return send_from_directory(UPLOAD_DIR, filename)
-
 
 @app.route("/upload-transcribe-save", methods=["POST"])
 def upload_transcribe_save():
@@ -170,7 +155,6 @@ def upload_transcribe_save():
         print("UPLOAD ERROR:", str(e))
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/api/sessions", methods=["GET"])
 def get_sessions():
     try:
@@ -205,7 +189,6 @@ def get_sessions():
         print("SESSIONS ERROR:", str(e))
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/live-transcribe", methods=["POST"])
 def live_transcribe():
     try:
@@ -221,7 +204,6 @@ def live_transcribe():
     except Exception as e:
         print("LIVE TRANSCRIBE ERROR:", str(e))
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/live-final-save", methods=["POST"])
 def live_final_save():
