@@ -8,7 +8,7 @@ from database import db, Session, SessionFile, log_action
 from auth import auth_bp
 from whisper_service import transcribe_audio
 
-app = Flask(__name__, static_folder="static", static_url_path="", template_folder="templates")
+app = Flask(__name__, static_folder=".", static_url_path="", template_folder=".")
 CORS(app)
 
 MYSQL_HOST = os.environ.get("MYSQLHOST", "localhost")
