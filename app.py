@@ -1,136 +1,249 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nebras | Sessions</title>
-  <meta name="description" content="Manage your saved transcription sessions." />
-  <link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
+import os
+import uuid
+from flask import Flask, request, jsonify, send_from_directory, render_template
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
-<header class="navbar">
-  <div class="container nav-container">
-    <div class="logo"><a href="/dashboard">Nebras</a></div>
-    <nav class="nav-links">
-      <a href="/dashboard">Dashboard</a>
-      <a href="/live-page">Live</a>
-      <a href="/upload-page">Upload</a>
-      <button id="logoutBtn" class="btn-outline" type="button">Logout</button>
-    </nav>
-  </div>
-</header>
+from database import db, Session, SessionFile, log_action
+from auth import auth_bp
+from whisper_service import transcribe_audio
 
-<main class="sessions-page">
-  <div class="container">
+app = Flask(__name__, static_folder="static", static_url_path="", template_folder="templates")
+CORS(app)
 
-    <section class="page-header">
-      <h1>Sessions</h1>
-      <p class="muted">Open, edit, update, and delete your saved sessions.</p>
-    </section>
+MYSQL_HOST = os.environ.get("MYSQLHOST", "localhost")
+MYSQL_PORT = os.environ.get("MYSQLPORT", "3306")
+MYSQL_USER = os.environ.get("MYSQLUSER", "root")
+MYSQL_PASSWORD = os.environ.get("MYSQLPASSWORD", "")
+MYSQL_DATABASE = os.environ.get("MYSQLDATABASE", "railway")
 
-    <section class="sessions-layout">
+database_url = os.environ.get("MYSQL_PUBLIC_URL") or \
+    f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
 
-      <!-- LEFT: List -->
-      <div class="sessions-list-panel">
-        <div class="panel-header">
-          <h2>Your Sessions</h2>
-          <button id="refreshBtn" class="btn-outline" type="button">Refresh</button>
-        </div>
+if database_url.startswith("mysql://"):
+    database_url = database_url.replace("mysql://", "mysql+pymysql://", 1)
+if "charset" not in database_url:
+    database_url += "?charset=utf8mb4"
 
-        <div class="controls">
-          <input id="filterInput" class="input" type="text" placeholder="Filter by title..." />
-          <button id="clearFilterBtn" class="btn-outline" type="button">Clear</button>
-        </div>
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-key")
 
-        <ul id="sessionsList" class="sessions-list" aria-label="Sessions list"></ul>
+db.init_app(app)
 
-        <div id="listMessageBox" class="message-box" role="status" aria-live="polite"></div>
-      </div>
+with app.app_context():
+    db.create_all()
 
-      <!-- RIGHT: Viewer/Editor -->
-      <div class="session-viewer-panel">
-        <div class="panel-header">
-          <h2>Session Editor</h2>
-          <span class="muted" id="activeSessionMeta"></span>
-        </div>
+app.register_blueprint(auth_bp)
 
-        <div class="controls">
-          <input id="sessionTitleInput" class="input" type="text" placeholder="Session title" />
-          <button id="updateSessionBtn" class="btn-primary" type="button" disabled>Update</button>
-          <button id="exportTxtBtn" class="btn-outline" type="button" disabled>Export TXT</button>
-        </div>
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-        <div class="controls">
-          <button id="fontMinusBtn" class="btn-outline" type="button">A-</button>
-          <button id="fontPlusBtn" class="btn-outline" type="button">A+</button>
+ALLOWED_EXTENSIONS = {"wav", "mp3", "ogg", "m4a", "webm", "flac"}
 
-          <label class="sr-only" for="fontFamilySelect">Font Family</label>
-          <select id="fontFamilySelect" class="select">
-            <option value="sans">Sans</option>
-            <option value="serif">Serif</option>
-            <option value="mono">Mono</option>
-          </select>
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-          <button id="alignLeftBtn" class="btn-outline" type="button">Left</button>
-          <button id="alignCenterBtn" class="btn-outline" type="button">Center</button>
-          <button id="alignRightBtn" class="btn-outline" type="button">Right</button>
+def save_uploaded_file(file_storage):
+    original_name = secure_filename(file_storage.filename or "audio")
+    ext = os.path.splitext(original_name)[1].lower()
+    if ext.replace(".", "") not in ALLOWED_EXTENSIONS:
+        ext = ".wav"
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+    stored_path = os.path.join(UPLOAD_DIR, stored_name)
+    file_storage.save(stored_path)
+    if not os.path.exists(stored_path):
+        raise FileNotFoundError(f"Saved upload not found: {stored_path}")
+    return {"original_name": original_name, "stored_name": stored_name,
+            "stored_path": stored_path, "mime_type": file_storage.mimetype,
+            "size_bytes": os.path.getsize(stored_path)}
 
-          <button id="readingModeBtn" class="btn-outline" type="button">Reading Mode</button>
-        </div>
+def create_session_with_file(user_id, title, transcript, source_type, file_meta, language_code=None):
+    session_row = Session(user_id=user_id, title=title or "Untitled Session",
+        transcript=transcript or "", source_type=source_type,
+        language_code=language_code, model_name="whisper", status="completed")
+    db.session.add(session_row)
+    db.session.commit()
+    file_row = SessionFile(session_id=session_row.id,
+        original_name=file_meta.get("original_name"), stored_path=file_meta.get("stored_path"),
+        mime_type=file_meta.get("mime_type"), size_bytes=file_meta.get("size_bytes"), duration_seconds=None)
+    db.session.add(file_row)
+    db.session.commit()
+    log_action(user_id=user_id, action="SESSION_CREATE", entity_type="session",
+        entity_id=session_row.id, ip_address=request.remote_addr,
+        user_agent=request.user_agent.string if request.user_agent else None,
+        details={"source_type": source_type, "title": title})
+    return session_row, file_row
 
-        <div class="controls">
-          <label class="sr-only" for="highlightSelect">Highlight Color</label>
-          <select id="highlightSelect" class="select">
-            <option value="hl-yellow">Highlight Yellow</option>
-            <option value="hl-blue">Highlight Blue</option>
-            <option value="hl-green">Highlight Green</option>
-            <option value="hl-pink">Highlight Pink</option>
-          </select>
-          <button id="applyHighlightBtn" class="btn-outline" type="button">Apply Highlight</button>
+from auth import _get_user_from_auth_header
 
-          <button id="cleanBtn" class="btn-outline" type="button">Clean Text</button>
-          <button id="copyBtn" class="btn-outline" type="button">Copy All</button>
-          <button id="clearTextBtn" class="btn-outline" type="button">Clear Text</button>
-        </div>
+def require_auth():
+    return _get_user_from_auth_header()
 
-        <div class="controls">
-          <label class="sr-only" for="findInput">Find</label>
-          <input id="findInput" class="input" type="text" placeholder="Find..." />
-          <button id="findBtn" class="btn-outline" type="button">Find</button><button id="findNextBtn" class="btn-outline" type="button">Find Next</button>
-          <button id="clearFindBtn" class="btn-outline" type="button">Clear Find</button>
+@app.route("/")
+def home():
+    return render_template("index.html")
 
-          <label class="sr-only" for="replaceInput">Replace With</label>
-          <input id="replaceInput" class="input" type="text" placeholder="Replace with..." />
+@app.route("/login")
+def login_page():
+    return render_template("login.html")
 
-          <button id="replaceOneBtn" class="btn-outline" type="button">Replace One</button>
-          <button id="replaceAllBtn" class="btn-outline" type="button">Replace All</button>
-        </div>
+@app.route("/register")
+def register_page():
+    return render_template("register.html")
 
-        <div class="transcript-box">
-          <label class="transcript-label" for="editor">Editor</label>
-          <div id="editor" class="rich-editor" contenteditable="true" spellcheck="false"></div>
-        </div>
+@app.route("/dashboard")
+def dashboard_page():
+    return render_template("dashboard.html")
 
-        <div class="controls">
-          <span class="muted" id="wordCount">Words: 0</span>
-          <span class="muted" id="charCount">Chars: 0</span>
-        </div>
+@app.route("/live-page")
+@app.route("/live")
+def live_page():
+    return render_template("live.html")
 
-        <div id="viewerMessageBox" class="message-box" role="status" aria-live="polite"></div>
-      </div>
+@app.route("/upload-page")
+@app.route("/upload")
+def upload_page():
+    return render_template("upload.html")
 
-    </section>
-  </div>
-</main>
+@app.route("/sessions-page")
+@app.route("/sessions-view")
+@app.route("/sessions")
+def sessions_page():
+    return render_template("sessions.html")
 
-<footer class="footer">
-  <div class="container footer-content">
-    <p>© <span id="year"></span> Nebras. All rights reserved.</p>
-  </div>
-</footer>
+@app.route("/uploads/<path:filename>")
+def uploaded_audio(filename):
+    user = require_auth()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    return send_from_directory(UPLOAD_DIR, filename)
 
-<script src="js/main.js" defer></script>
-<script src="js/sessions.js" defer></script>
-</body>
-</html>
+@app.route("/upload-transcribe-save", methods=["POST"])
+def upload_transcribe_save():
+    try:
+        user = require_auth()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        if "audio" not in request.files:
+            return jsonify({"error": "No audio file uploaded."}), 400
+        file = request.files["audio"]
+        title = (request.form.get("title") or "").strip()
+        if file.filename == "":
+            return jsonify({"error": "Empty file name."}), 400
+        if not allowed_file(file.filename):
+            return jsonify({"error": "Unsupported audio type."}), 400
+        file_meta = save_uploaded_file(file)
+        whisper_result = transcribe_audio(file_meta["stored_path"])
+        session_row, _ = create_session_with_file(user_id=user.id,
+            title=title or file_meta["original_name"], transcript=whisper_result["text"],
+            source_type="upload", file_meta=file_meta, language_code=whisper_result.get("language"))
+        return jsonify({"message": "Upload session saved successfully.",
+            "session_id": int(session_row.id), "transcription": whisper_result["text"]}), 200
+    except Exception as e:
+        print("UPLOAD ERROR:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/sessions", methods=["GET"])
+def get_sessions():
+    try:
+        user = require_auth()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        rows = (db.session.query(Session, SessionFile)
+            .outerjoin(SessionFile, Session.id == SessionFile.session_id)
+            .filter(Session.user_id == user.id)
+            .order_by(Session.created_at.desc()).all())
+        result = []
+        for session_row, file_row in rows:
+            audio_url = None
+            if file_row and file_row.stored_path:
+                audio_url = f"/uploads/{os.path.basename(file_row.stored_path)}"
+            result.append({"id": int(session_row.id), "title": session_row.title,
+                "transcript": session_row.transcript, "source_type": session_row.source_type,
+                "status": session_row.status,
+                "created_at": session_row.created_at.isoformat() if session_row.created_at else None,
+                "audio_url": audio_url, "audio_name": file_row.original_name if file_row else None})
+        return jsonify({"sessions": result}), 200
+    except Exception as e:
+        print("SESSIONS ERROR:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/sessions/<int:session_id>", methods=["PUT"])
+def update_session(session_id):
+    try:
+        user = require_auth()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        session_row = Session.query.filter_by(id=session_id, user_id=user.id).first()
+        if not session_row:
+            return jsonify({"error": "Session not found"}), 404
+        data = request.get_json(silent=True) or {}
+        if "title" in data:
+            session_row.title = data["title"]
+        if "transcript" in data:
+            session_row.transcript = data["transcript"]
+        db.session.commit()
+        return jsonify({"message": "Session updated successfully."}), 200
+    except Exception as e:
+        print("UPDATE SESSION ERROR:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/sessions-text", methods=["POST"])
+def save_text_session():
+    try:
+        user = require_auth()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        data = request.get_json(silent=True) or {}
+        title = (data.get("title") or "").strip() or "Live Session"
+        transcript = (data.get("transcript") or "").strip()
+        session_row = Session(user_id=user.id, title=title, transcript=transcript,
+            source_type="live", model_name="whisper", status="completed")
+        db.session.add(session_row)
+        db.session.commit()
+        return jsonify({"message": "Session saved.", "session_id": int(session_row.id)}), 200
+    except Exception as e:
+        print("SAVE TEXT SESSION ERROR:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/live-transcribe", methods=["POST"])
+def live_transcribe():
+    try:
+        user = require_auth()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        if "audio" not in request.files:
+            return jsonify({"error": "No audio file."}), 400
+        file = request.files["audio"]
+        file_meta = save_uploaded_file(file)
+        whisper_result = transcribe_audio(file_meta["stored_path"])
+        return jsonify({"transcription": whisper_result["text"]}), 200
+    except Exception as e:
+        print("LIVE TRANSCRIBE ERROR:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/live-final-save", methods=["POST"])
+def live_final_save():
+    try:
+        user = require_auth()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        if "audio" not in request.files:
+            return jsonify({"error": "No audio file."}), 400
+        file = request.files["audio"]
+        title = (request.form.get("title") or "").strip()
+        transcript = (request.form.get("transcript") or "").strip()
+        file_meta = save_uploaded_file(file)
+        session_row, _ = create_session_with_file(user_id=user.id,
+            title=title or "Live Session", transcript=transcript,
+            source_type="live", file_meta=file_meta)
+        return jsonify({"message": "Live session saved.", "session_id": int(session_row.id)}), 200
+    except Exception as e:
+        print("LIVE FINAL SAVE ERROR:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
