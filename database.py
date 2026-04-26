@@ -1,94 +1,122 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nebras | AI Speech-to-Text</title>
-  <meta name="description" content="Nebras is a web experience for turning speech into editable text sessions." />
-  <link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+from sqlalchemy.dialects.mysql import LONGTEXT, JSON as MYSQLJSON
 
-<header class="navbar">
-  <div class="container nav-container">
-    <div class="logo"><a href="/">Nebras</a></div>
+db = SQLAlchemy()
 
-    <nav class="nav-links">
-      <a href="#about">About</a>
-      <a href="#features">Features</a>
-      <a href="/login">Sign In</a>
-      <a href="/register">Create Account</a>
-    </nav>
-  </div>
-</header>
 
-<main>
-  <section class="hero">
-    <div class="container hero-container">
-      <div class="hero-content">
-        <h1>Turn Speech Into Clean Text</h1>
-        <p class="muted">
-          Nebras provides a clean workflow to capture audio, edit transcripts, save sessions,
-          and export results for documentation and accessibility.
-        </p>
+class User(db.Model):
+    __tablename__ = "users"
 
-        <div class="hero-buttons">
-          <a class="btn-primary" href="/register">Get Started</a>
-          <a class="btn-outline" href="/login">Sign In</a>
-        </div>
-      </div>
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
 
-      <div class="hero-image">
-        <img src="images/hero.jpg" alt="AI speech recognition and transcription illustration" />
-      </div>
-    </div>
-  </section>
+    display_name = db.Column(db.String(80))
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
 
-  <section id="about" class="section">
-    <div class="container">
-      <h2>About Nebras</h2>
-      <p class="muted">
-        Nebras is built to support structured transcription sessions. Users can record or upload audio,
-        convert it into text (via AI), then review, refine, and store it for later access.
-      </p>
-    </div>
-  </section>
+    email_verified_at = db.Column(db.DateTime)
+    last_login_at = db.Column(db.DateTime)
 
-  <section id="features" class="section">
-    <div class="container">
-      <h2>Key Features</h2>
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime)
 
-      <div class="cards">
-        <article class="card">
-          <h3>Live Mode</h3>
-          <p class="muted">Record from your microphone and work in an editor.</p>
-        </article>
 
-        <article class="card">
-          <h3>Upload Mode</h3>
-          <p class="muted">Upload audio files and manage transcript sessions.</p>
-        </article>
+class Session(db.Model):
+    __tablename__ = "sessions"
 
-        <article class="card">
-          <h3>Session Management</h3>
-          <p class="muted">Save, open, and delete sessions from your workspace.</p>
-        </article>
-      </div>
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.BigInteger, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
-      <div class="section-cta">
-        <p class="muted">Ready to start?</p>
-        <a class="btn-primary" href="/register">Create Account</a>
-      </div>
-    </div>
-  </section>
-</main>
+    title = db.Column(db.String(160), nullable=False, default="Untitled Session")
+    transcript = db.Column(LONGTEXT, nullable=False)
 
-<footer class="footer">
-  <div class="container footer-content">
-    <p>© <span id="year"></span> Nebras. All rights reserved.</p>
-  </div>
-</footer>
+    source_type = db.Column(db.Enum("live", "upload"), nullable=False, default="upload")
+    language_code = db.Column(db.String(10))
+    model_name = db.Column(db.String(80), nullable=False, default="whisper")
+    confidence_score = db.Column(db.Numeric(5, 4))
 
-<script src="js/main.js" defer></script>
-</body>
-</html>
+    status = db.Column(db.Enum("draft", "processing", "completed", "failed"), nullable=False, default="completed")
+    error_message = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime)
+
+
+class SessionFile(db.Model):
+    __tablename__ = "session_files"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    session_id = db.Column(db.BigInteger, db.ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
+
+    original_name = db.Column(db.String(255))
+    stored_path = db.Column(db.String(255))
+    mime_type = db.Column(db.String(80))
+    size_bytes = db.Column(db.BigInteger)
+    duration_seconds = db.Column(db.Integer)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AuthToken(db.Model):
+    __tablename__ = "auth_tokens"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.BigInteger, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    token_hash = db.Column(db.String(64), unique=True, nullable=False)
+    device_name = db.Column(db.String(120))
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.String(255))
+
+    expires_at = db.Column(db.DateTime, nullable=False)
+    revoked_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class PasswordReset(db.Model):
+    __tablename__ = "password_resets"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.BigInteger, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    reset_token_hash = db.Column(db.String(64), unique=True, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AuditLog(db.Model):
+    __tablename__ = "audit_logs"
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.BigInteger, db.ForeignKey("users.id", ondelete="SET NULL"))
+
+    action = db.Column(db.String(80), nullable=False)
+    entity_type = db.Column(db.String(40))
+    entity_id = db.Column(db.BigInteger)
+
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.String(255))
+
+    details = db.Column(MYSQLJSON)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+def log_action(action, user_id=None, entity_type=None, entity_id=None,
+               ip_address=None, user_agent=None, details=None):
+    try:
+        log = AuditLog(
+            user_id=user_id,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details=details,
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
