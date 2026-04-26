@@ -1,249 +1,184 @@
-import os
-import uuid
-from flask import Flask, request, jsonify, send_from_directory, render_template
-from flask_cors import CORS
-from werkzeug.utils import secure_filename
+from flask import Blueprint, request, jsonify
+from datetime import datetime, timedelta
+import secrets
+import hashlib
 
-from database import db, Session, SessionFile, log_action
-from auth import auth_bp
-from whisper_service import transcribe_audio
+from werkzeug.security import generate_password_hash, check_password_hash
 
-app = Flask(__name__, static_folder="static", static_url_path="", template_folder="templates")
-CORS(app)
+from database import db, User, AuthToken, log_action
 
-MYSQL_HOST = os.environ.get("MYSQLHOST", "localhost")
-MYSQL_PORT = os.environ.get("MYSQLPORT", "3306")
-MYSQL_USER = os.environ.get("MYSQLUSER", "root")
-MYSQL_PASSWORD = os.environ.get("MYSQLPASSWORD", "")
-MYSQL_DATABASE = os.environ.get("MYSQLDATABASE", "railway")
+auth_bp = Blueprint("auth", __name__)
 
-database_url = os.environ.get("MYSQL_PUBLIC_URL") or \
-    f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+TOKEN_DAYS = 7
 
-if database_url.startswith("mysql://"):
-    database_url = database_url.replace("mysql://", "mysql+pymysql://", 1)
-if "charset" not in database_url:
-    database_url += "?charset=utf8mb4"
 
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-key")
+def _hash_token(raw_token: str) -> str:
+    # SHA-256 hex 64 chars (مطابق لعمود token_hash CHAR(64))
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
-db.init_app(app)
 
-with app.app_context():
-    db.create_all()
+def _get_user_from_auth_header():
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    raw = auth.replace("Bearer ", "", 1).strip()
+    if not raw:
+        return None
 
-app.register_blueprint(auth_bp)
+    token_hash = _hash_token(raw)
 
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+    token_row = AuthToken.query.filter_by(token_hash=token_hash).first()
+    if not token_row:
+        return None
+    if token_row.revoked_at is not None:
+        return None
+    if token_row.expires_at <= datetime.utcnow():
+        return None
 
-ALLOWED_EXTENSIONS = {"wav", "mp3", "ogg", "m4a", "webm", "flac"}
+    user = User.query.get(token_row.user_id)
+    return user
 
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def save_uploaded_file(file_storage):
-    original_name = secure_filename(file_storage.filename or "audio")
-    ext = os.path.splitext(original_name)[1].lower()
-    if ext.replace(".", "") not in ALLOWED_EXTENSIONS:
-        ext = ".wav"
-    stored_name = f"{uuid.uuid4().hex}{ext}"
-    stored_path = os.path.join(UPLOAD_DIR, stored_name)
-    file_storage.save(stored_path)
-    if not os.path.exists(stored_path):
-        raise FileNotFoundError(f"Saved upload not found: {stored_path}")
-    return {"original_name": original_name, "stored_name": stored_name,
-            "stored_path": stored_path, "mime_type": file_storage.mimetype,
-            "size_bytes": os.path.getsize(stored_path)}
+@auth_bp.route("/api/register", methods=["POST"])
+def api_register():
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
 
-def create_session_with_file(user_id, title, transcript, source_type, file_meta, language_code=None):
-    session_row = Session(user_id=user_id, title=title or "Untitled Session",
-        transcript=transcript or "", source_type=source_type,
-        language_code=language_code, model_name="whisper", status="completed")
-    db.session.add(session_row)
+    if not username or not email or not password:
+        return jsonify({"error": "Missing required fields"}), 400
+    if len(username) < 3:
+        return jsonify({"error": "Username must be at least 3 characters"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({"error": "Username already exists"}), 409
+    if User.query.filter_by(email=email).first():
+        return jsonify({"error": "Email already exists"}), 409
+
+    new_user = User(
+        username=username,
+        email=email,
+        password_hash=generate_password_hash(password),  # PBKDF2
+        created_at=datetime.utcnow(),
+    )
+    db.session.add(new_user)
     db.session.commit()
-    file_row = SessionFile(session_id=session_row.id,
-        original_name=file_meta.get("original_name"), stored_path=file_meta.get("stored_path"),
-        mime_type=file_meta.get("mime_type"), size_bytes=file_meta.get("size_bytes"), duration_seconds=None)
-    db.session.add(file_row)
+
+    # Audit
+    log_action(
+        action="USER_REGISTER",
+        user_id=new_user.id,
+        entity_type="user",
+        entity_id=new_user.id,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+        details={"email": new_user.email, "username": new_user.username},
+    )
+
+    return jsonify({"message": "Account created successfully"}), 201
+
+
+@auth_bp.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.get_json(silent=True) or {}
+    username_or_email = (data.get("username") or data.get("email") or "").strip()
+    password = data.get("password") or ""
+
+    if not username_or_email or not password:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    user = User.query.filter_by(username=username_or_email).first()
+    if not user:
+        user = User.query.filter_by(email=username_or_email.lower()).first()
+
+    if not user:
+        log_action(
+            action="LOGIN_FAILED",
+            user_id=None,
+            entity_type="user",
+            entity_id=None,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            details={"reason": "user_not_found", "login": username_or_email},
+        )
+        return jsonify({"error": "User not found"}), 404
+
+    if not check_password_hash(user.password_hash, password):
+        log_action(
+            action="LOGIN_FAILED",
+            user_id=user.id,
+            entity_type="user",
+            entity_id=user.id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            details={"reason": "wrong_password"},
+        )
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    user.last_login_at = datetime.utcnow()
     db.session.commit()
-    log_action(user_id=user_id, action="SESSION_CREATE", entity_type="session",
-        entity_id=session_row.id, ip_address=request.remote_addr,
-        user_agent=request.user_agent.string if request.user_agent else None,
-        details={"source_type": source_type, "title": title})
-    return session_row, file_row
 
-from auth import _get_user_from_auth_header
+    # اصدار توكن وتخزين هاشه في DB
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = _hash_token(raw_token)
 
-def require_auth():
-    return _get_user_from_auth_header()
+    token_row = AuthToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        device_name="web",
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+        expires_at=datetime.utcnow() + timedelta(days=TOKEN_DAYS),
+        created_at=datetime.utcnow(),
+    )
+    db.session.add(token_row)
+    db.session.commit()
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+    log_action(
+        action="LOGIN_SUCCESS",
+        user_id=user.id,
+        entity_type="user",
+        entity_id=user.id,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+        details={"expires_days": TOKEN_DAYS},
+    )
 
-@app.route("/login")
-def login_page():
-    return render_template("login.html")
+    return jsonify({
+        "token": raw_token,
+        "user": {"id": user.id, "username": user.username, "email": user.email}
+    }), 200
 
-@app.route("/register")
-def register_page():
-    return render_template("register.html")
 
-@app.route("/dashboard")
-def dashboard_page():
-    return render_template("dashboard.html")
-
-@app.route("/live-page")
-@app.route("/live")
-def live_page():
-    return render_template("live.html")
-
-@app.route("/upload-page")
-@app.route("/upload")
-def upload_page():
-    return render_template("upload.html")
-
-@app.route("/sessions-page")
-@app.route("/sessions-view")
-@app.route("/sessions")
-def sessions_page():
-    return render_template("sessions.html")
-
-@app.route("/uploads/<path:filename>")
-def uploaded_audio(filename):
-    user = require_auth()
+@auth_bp.route("/api/me", methods=["GET"])
+def api_me():
+    user = _get_user_from_auth_header()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
-    return send_from_directory(UPLOAD_DIR, filename)
+    return jsonify({
+        "id": user.id,
+        "username": user.username,
+        "email": user.email
+    }), 200
 
-@app.route("/upload-transcribe-save", methods=["POST"])
-def upload_transcribe_save():
-    try:
-        user = require_auth()
-        if not user:
-            return jsonify({"error": "Unauthorized"}), 401
-        if "audio" not in request.files:
-            return jsonify({"error": "No audio file uploaded."}), 400
-        file = request.files["audio"]
-        title = (request.form.get("title") or "").strip()
-        if file.filename == "":
-            return jsonify({"error": "Empty file name."}), 400
-        if not allowed_file(file.filename):
-            return jsonify({"error": "Unsupported audio type."}), 400
-        file_meta = save_uploaded_file(file)
-        whisper_result = transcribe_audio(file_meta["stored_path"])
-        session_row, _ = create_session_with_file(user_id=user.id,
-            title=title or file_meta["original_name"], transcript=whisper_result["text"],
-            source_type="upload", file_meta=file_meta, language_code=whisper_result.get("language"))
-        return jsonify({"message": "Upload session saved successfully.",
-            "session_id": int(session_row.id), "transcription": whisper_result["text"]}), 200
-    except Exception as e:
-        print("UPLOAD ERROR:", str(e))
-        return jsonify({"error": str(e)}), 500
 
-@app.route("/api/sessions", methods=["GET"])
-def get_sessions():
-    try:
-        user = require_auth()
-        if not user:
-            return jsonify({"error": "Unauthorized"}), 401
-        rows = (db.session.query(Session, SessionFile)
-            .outerjoin(SessionFile, Session.id == SessionFile.session_id)
-            .filter(Session.user_id == user.id)
-            .order_by(Session.created_at.desc()).all())
-        result = []
-        for session_row, file_row in rows:
-            audio_url = None
-            if file_row and file_row.stored_path:
-                audio_url = f"/uploads/{os.path.basename(file_row.stored_path)}"
-            result.append({"id": int(session_row.id), "title": session_row.title,
-                "transcript": session_row.transcript, "source_type": session_row.source_type,
-                "status": session_row.status,
-                "created_at": session_row.created_at.isoformat() if session_row.created_at else None,
-                "audio_url": audio_url, "audio_name": file_row.original_name if file_row else None})
-        return jsonify({"sessions": result}), 200
-    except Exception as e:
-        print("SESSIONS ERROR:", str(e))
-        return jsonify({"error": str(e)}), 500
+@auth_bp.route("/api/logout", methods=["POST"])
+def api_logout():
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return jsonify({"error": "Unauthorized"}), 401
+    raw = auth.replace("Bearer ", "", 1).strip()
+    if not raw:
+        return jsonify({"error": "Unauthorized"}), 401
 
-@app.route("/api/sessions/<int:session_id>", methods=["PUT"])
-def update_session(session_id):
-    try:
-        user = require_auth()
-        if not user:
-            return jsonify({"error": "Unauthorized"}), 401
-        session_row = Session.query.filter_by(id=session_id, user_id=user.id).first()
-        if not session_row:
-            return jsonify({"error": "Session not found"}), 404
-        data = request.get_json(silent=True) or {}
-        if "title" in data:
-            session_row.title = data["title"]
-        if "transcript" in data:
-            session_row.transcript = data["transcript"]
-        db.session.commit()
-        return jsonify({"message": "Session updated successfully."}), 200
-    except Exception as e:
-        print("UPDATE SESSION ERROR:", str(e))
-        return jsonify({"error": str(e)}), 500
+    token_hash = _hash_token(raw)
+    token_row = AuthToken.query.filter_by(token_hash=token_hash).first()
+    if not token_row:
+        return jsonify({"message": "OK"}), 200
 
-@app.route("/api/sessions-text", methods=["POST"])
-def save_text_session():
-    try:
-        user = require_auth()
-        if not user:
-            return jsonify({"error": "Unauthorized"}), 401
-        data = request.get_json(silent=True) or {}
-        title = (data.get("title") or "").strip() or "Live Session"
-        transcript = (data.get("transcript") or "").strip()
-        session_row = Session(user_id=user.id, title=title, transcript=transcript,
-            source_type="live", model_name="whisper", status="completed")
-        db.session.add(session_row)
-        db.session.commit()
-        return jsonify({"message": "Session saved.", "session_id": int(session_row.id)}), 200
-    except Exception as e:
-        print("SAVE TEXT SESSION ERROR:", str(e))
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/live-transcribe", methods=["POST"])
-def live_transcribe():
-    try:
-        user = require_auth()
-        if not user:
-            return jsonify({"error": "Unauthorized"}), 401
-        if "audio" not in request.files:
-            return jsonify({"error": "No audio file."}), 400
-        file = request.files["audio"]
-        file_meta = save_uploaded_file(file)
-        whisper_result = transcribe_audio(file_meta["stored_path"])
-        return jsonify({"transcription": whisper_result["text"]}), 200
-    except Exception as e:
-        print("LIVE TRANSCRIBE ERROR:", str(e))
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/live-final-save", methods=["POST"])
-def live_final_save():
-    try:
-        user = require_auth()
-        if not user:
-            return jsonify({"error": "Unauthorized"}), 401
-        if "audio" not in request.files:
-            return jsonify({"error": "No audio file."}), 400
-        file = request.files["audio"]
-        title = (request.form.get("title") or "").strip()
-        transcript = (request.form.get("transcript") or "").strip()
-        file_meta = save_uploaded_file(file)
-        session_row, _ = create_session_with_file(user_id=user.id,
-            title=title or "Live Session", transcript=transcript,
-            source_type="live", file_meta=file_meta)
-        return jsonify({"message": "Live session saved.", "session_id": int(session_row.id)}), 200
-    except Exception as e:
-        print("LIVE FINAL SAVE ERROR:", str(e))
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    token_row.revoked_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({"message": "Logged out"}), 200
