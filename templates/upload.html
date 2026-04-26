@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nebras | Upload</title>
+  <meta name="description" content="Upload audio and work with transcripts in a structured editor." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container nav-container">
+    <div class="logo"><a href="/dashboard">Nebras</a></div>
+    <nav class="nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/live-page">Live</a>
+      <a href="/sessions-page">Sessions</a>
+      <button id="logoutBtn" class="btn-outline" type="button">Logout</button>
+    </nav>
+  </div>
+</header>
+
+<main class="tool-page">
+  <div class="container">
+
+    <section class="page-header">
+      <h1>Upload Session</h1>
+      <p class="muted">Upload audio, then edit and save your transcript session.</p>
+    </section>
+
+    <section class="tool-panel">
+
+      <div class="status-bar">
+        <span class="status-label">Status:</span>
+        <span id="statusPill" class="status-pill">Ready</span>
+        <span class="muted" id="autosavePill"></span>
+      </div>
+
+      <!-- Upload audio -->
+      <div class="controls">
+        <input id="audioFileInput" class="input" type="file" accept="audio/*" />
+        <button id="clearAudioBtn" class="btn-outline" type="button">Clear Audio</button>
+      </div>
+
+      <div id="audioInfo" class="muted"></div>
+
+      <div id="audioPlayerWrap">
+        <audio id="audioPlayer" controls></audio>
+      </div>
+
+      <!-- Editor Tools Row 1 -->
+      <div class="controls">
+        <button id="fontMinusBtn" class="btn-outline" type="button">A-</button>
+        <button id="fontPlusBtn" class="btn-outline" type="button">A+</button>
+
+        <label class="sr-only" for="fontFamilySelect">Font Family</label>
+        <select id="fontFamilySelect" class="select">
+          <option value="sans">Sans</option>
+          <option value="serif">Serif</option>
+          <option value="mono">Mono</option>
+        </select>
+
+        <button id="alignLeftBtn" class="btn-outline" type="button">Left</button>
+        <button id="alignCenterBtn" class="btn-outline" type="button">Center</button>
+        <button id="alignRightBtn" class="btn-outline" type="button">Right</button>
+
+        <button id="readingModeBtn" class="btn-outline" type="button">Reading Mode</button>
+      </div>
+
+      <!-- Editor Tools Row 2 -->
+      <div class="controls">
+        <label class="sr-only" for="highlightSelect">Highlight Color</label>
+        <select id="highlightSelect" class="select">
+          <option value="hl-yellow">Highlight Yellow</option>
+          <option value="hl-blue">Highlight Blue</option>
+          <option value="hl-green">Highlight Green</option>
+          <option value="hl-pink">Highlight Pink</option>
+        </select>
+        <button id="applyHighlightBtn" class="btn-outline" type="button">Apply Highlight</button>
+
+        <button id="cleanBtn" class="btn-outline" type="button">Clean Text</button>
+        <button id="copyBtn" class="btn-outline" type="button">Copy All</button>
+        <button id="saveDraftBtn" class="btn-outline" type="button">Save Draft</button>
+        <button id="clearTextBtn" class="btn-outline" type="button">Clear Text</button>
+      </div>
+
+      <!-- Search / Replace -->
+      <div class="controls">
+        <label class="sr-only" for="findInput">Find</label>
+        <input id="findInput" class="input" type="text" placeholder="Find..." />
+
+        <button id="findBtn" class="btn-outline" type="button">Find</button>
+        <button id="findNextBtn" class="btn-outline" type="button">Find Next</button>
+        <button id="clearFindBtn" class="btn-outline" type="button">Clear Find</button>
+
+        <label class="sr-only" for="replaceInput">Replace With</label>
+        <input id="replaceInput" class="input" type="text" placeholder="Replace with..." />
+
+        <button id="replaceOneBtn" class="btn-outline" type="button">Replace One</button><button id="replaceAllBtn" class="btn-outline" type="button">Replace All</button>
+      </div>
+
+      <!-- Editor -->
+      <div class="transcript-box">
+        <label class="transcript-label" for="editor">Editor</label>
+        <div id="editor" class="rich-editor" contenteditable="true" spellcheck="false"></div>
+      </div>
+
+      <div class="controls">
+        <span class="muted" id="wordCount">Words: 0</span>
+        <span class="muted" id="charCount">Chars: 0</span>
+      </div>
+
+      <div class="actions">
+        <input id="sessionTitle" class="input" type="text" placeholder="Session title (optional)" />
+        <button id="saveSessionBtn" class="btn-primary" type="button">Save Session</button>
+      </div>
+
+      <div id="messageBox" class="message-box" role="status" aria-live="polite"></div>
+
+    </section>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container footer-content">
+    <p>© <span id="year"></span> Nebras. All rights reserved.</p>
+  </div>
+</footer>
+
+<script src="js/main.js" defer></script>
+<script src="js/upload.js" defer></script>
+</body>
+</html>

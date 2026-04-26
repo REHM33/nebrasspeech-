@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nebras | Create Account</title>
+  <meta name="description" content="Create an account to use Nebras tools." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="navbar">
+  <div class="container nav-container">
+    <div class="logo"><a href="/">Nebras</a></div>
+    <nav class="nav-links">
+      <a href="/">Home</a>
+      <a href="/login">Sign In</a>
+    </nav>
+  </div>
+</header>
+<main class="auth-page">
+  <div class="container auth-container">
+    <section class="auth-card">
+      <h1>Create Account</h1>
+      <p class="muted">Create your account to access the dashboard.</p>
+      <form id="registerForm" class="form" novalidate>
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" required minlength="3" />
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" required minlength="6" />
+        </div>
+        <div class="form-group">
+          <label for="confirmPassword">Confirm Password</label>
+          <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" required minlength="6" />
+        </div>
+        <button class="btn-primary full-width" type="submit">Create Account</button>
+      </form>
+      <div id="message" class="message-box" role="status" aria-live="polite"></div>
+      <p class="muted">
+        Already have an account? <a href="/login">Sign in</a>
+      </p>
+    </section>
+  </div>
+</main>
+<footer class="footer">
+  <div class="container footer-content">
+    <p>© <span id="year"></span> Nebras. All rights reserved.</p>
+  </div>
+</footer>
+<script src="js/main.js" defer></script>
+<script src="js/register.js" defer></script>
+</body>
+</html>
