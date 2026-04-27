@@ -4,8 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nebras | Live</title>
-  <meta name="description" content="Live session editor with productivity tools." />
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .editors-wrap {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      transition: all 0.3s ease;
+    }
+    .editors-wrap.show-translation {
+      grid-template-columns: 1fr 1fr;
+    }
+    .translation-panel {
+      display: none;
+    }
+    .editors-wrap.show-translation .translation-panel {
+      display: block;
+    }
+    @media (max-width: 768px) {
+      .editors-wrap.show-translation {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
 
@@ -26,7 +47,7 @@
 
     <section class="page-header">
       <h1>Live Session</h1>
-      <p class="muted">Edit text, search, replace, highlight, save drafts, and manage sessions.</p>
+      <p class="muted">Record, transcribe, translate, and save your sessions.</p>
     </section>
 
     <section class="tool-panel">
@@ -34,9 +55,9 @@
       <div class="status-bar">
         <span class="status-label">Status:</span>
         <span id="statusPill" class="status-pill">Ready</span>
-        <span class="muted" id="autosavePill"></span>
       </div>
 
+      <!-- Recording -->
       <div class="controls">
         <button id="startRecBtn" class="btn-primary" type="button">Start Recording</button>
         <button id="stopRecBtn" class="btn-outline" type="button" disabled>Stop Recording</button>
@@ -44,26 +65,23 @@
         <span class="muted" id="recTimer">00:00</span>
       </div>
 
+      <!-- Font & Align -->
       <div class="controls">
         <button id="fontMinusBtn" class="btn-outline" type="button">A-</button>
         <button id="fontPlusBtn" class="btn-outline" type="button">A+</button>
-
-        <label class="sr-only" for="fontFamilySelect">Font Family</label>
         <select id="fontFamilySelect" class="select">
           <option value="sans">Sans</option>
           <option value="serif">Serif</option>
           <option value="mono">Mono</option>
         </select>
-
         <button id="alignLeftBtn" class="btn-outline" type="button">Left</button>
         <button id="alignCenterBtn" class="btn-outline" type="button">Center</button>
         <button id="alignRightBtn" class="btn-outline" type="button">Right</button>
-
         <button id="readingModeBtn" class="btn-outline" type="button">Reading Mode</button>
       </div>
 
+      <!-- Highlight & Actions -->
       <div class="controls">
-        <label class="sr-only" for="highlightSelect">Highlight Color</label>
         <select id="highlightSelect" class="select">
           <option value="hl-yellow">Highlight Yellow</option>
           <option value="hl-blue">Highlight Blue</option>
@@ -71,38 +89,66 @@
           <option value="hl-pink">Highlight Pink</option>
         </select>
         <button id="applyHighlightBtn" class="btn-outline" type="button">Apply Highlight</button>
-
         <button id="cleanBtn" class="btn-outline" type="button">Clean Text</button>
         <button id="copyBtn" class="btn-outline" type="button">Copy All</button>
         <button id="saveDraftBtn" class="btn-outline" type="button">Save Draft</button>
         <button id="clearTextBtn" class="btn-outline" type="button">Clear Text</button>
       </div>
 
+      <!-- Find & Replace -->
       <div class="controls">
-        <label class="sr-only" for="findInput">Find</label>
         <input id="findInput" class="input" type="text" placeholder="Find..." />
-
         <button id="findBtn" class="btn-outline" type="button">Find</button>
         <button id="findNextBtn" class="btn-outline" type="button">Find Next</button>
         <button id="clearFindBtn" class="btn-outline" type="button">Clear Find</button>
-
-        <label class="sr-only" for="replaceInput">Replace With</label>
         <input id="replaceInput" class="input" type="text" placeholder="Replace with..." />
-
         <button id="replaceOneBtn" class="btn-outline" type="button">Replace One</button>
         <button id="replaceAllBtn" class="btn-outline" type="button">Replace All</button>
       </div>
 
-      <div class="transcript-box"><label class="transcript-label" for="editor">Editor</label>
-        <div id="editor" class="rich-editor" contenteditable="true" spellcheck="false"></div>
-      </div>
-
+      <!-- Translate — سطر لحاله بعد Replace All -->
       <div class="controls">
-        <span class="muted" id="wordCount">Words: 0</span>
-        <span class="muted" id="charCount">Chars: 0</span>
+        <select id="translateLangSelect" class="select">
+          <option value="ar">→ Arabic</option>
+          <option value="en">→ English</option>
+          <option value="fr">→ French</option>
+          <option value="es">→ Spanish</option>
+          <option value="de">→ German</option>
+          <option value="tr">→ Turkish</option>
+        </select>
+        <button id="translateBtn" class="btn-outline" type="button">Translate</button>
       </div>
 
-      <div class="actions">
+      <!-- Editors Side by Side -->
+      <div class="editors-wrap" id="editorsWrap">
+
+        <!-- Original -->
+        <div>
+          <div class="transcript-box">
+            <label class="transcript-label">Original Text</label>
+            <div id="editor" class="rich-editor" contenteditable="true" spellcheck="false"></div>
+          </div>
+          <div class="controls">
+            <span class="muted" id="wordCount">Words: 0</span>
+            <span class="muted" id="charCount">Chars: 0</span>
+          </div>
+        </div>
+
+        <!-- Translation -->
+        <div class="translation-panel">
+          <div class="transcript-box">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+              <label class="transcript-label" style="margin:0;">Translation</label>
+              <button id="copyTranslationBtn" class="btn-outline" type="button">Copy</button>
+            </div>
+            <div id="translationBox" class="rich-editor" style="background:rgba(255,243,232,0.6);" spellcheck="false"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Save Session -->
+      <div class="actions" style="margin-top:16px;">
         <input id="sessionTitle" class="input" type="text" placeholder="Session title (optional)" />
         <button id="saveSessionBtn" class="btn-primary" type="button">Save Session</button>
       </div>
