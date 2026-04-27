@@ -185,13 +185,14 @@
     const text = (editor?.innerText || "").trim();
     if (!text) { show("No text to translate.", "error"); return; }
 
-    const targetLang = translateLangSelect?.value || "ar";
+    const sourceLang = document.getElementById("sourceLangSelect")?.value || "ar";
+    const targetLang = translateLangSelect?.value || "en";
     setStatus("Translating…");
     show("Translating…");
 
     try {
       const res = await fetch(
-        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`
       );
       const data = await res.json();
 
