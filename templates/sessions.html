@@ -57,7 +57,6 @@
         <div class="controls">
           <input id="sessionTitleInput" class="input" type="text" placeholder="Session title" />
           <button id="updateSessionBtn" class="btn-primary" type="button" disabled>Update</button>
-          <button id="translateBtn" class="btn-outline" type="button">Translate</button>
           <button id="exportTxtBtn" class="btn-outline" type="button" disabled>Export TXT</button>
         </div>
 
@@ -96,6 +95,18 @@
           <input id="replaceInput" class="input" type="text" placeholder="Replace..." />
           <button id="replaceOneBtn" class="btn-outline" type="button">Replace One</button>
           <button id="replaceAllBtn" class="btn-outline" type="button">Replace All</button>
+        </div>
+
+        <div class="controls">
+          <select id="fromLangSelect" class="select">
+            <option value="ar">From Arabic</option>
+            <option value="en">From English</option>
+          </select>
+          <select id="toLangSelect" class="select">
+            <option value="en">→ English</option>
+            <option value="ar">→ Arabic</option>
+          </select>
+          <button id="translateBtn" class="btn-outline" type="button">Translate</button>
         </div>
 
         <div class="editors-wrap" id="editorsWrap">
