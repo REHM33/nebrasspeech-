@@ -90,6 +90,7 @@
     if (sessionTitleInput) sessionTitleInput.value = s.title || "";
     if (editor) editor.textContent = s.transcript || "";
     
+    // إظهار الترجمة
     if (translationBox) {
       const tText = s.translation || "";
       translationBox.textContent = tText;
@@ -100,13 +101,18 @@
       }
     }
 
-    if (sessionAudioPlayer && (s.audio_url || s.file_path)) {
+    // إظهار الصوت ومعالجة المسار
+    if (sessionAudioPlayer) {
       const path = s.audio_url || s.file_path;
-      sessionAudioPlayer.src = path.startsWith('http') ? path : `/${path}`;
-      audioContainer.style.display = "block";
-      sessionAudioPlayer.load();
-    } else {
-      audioContainer.style.display = "none";
+      if (path) {
+        // إذا كان المسار لا يبدأ بـ http، نفترض أنه مخزن محلياً على السيرفر
+        sessionAudioPlayer.src = path.startsWith('http') ? path : `/${path}`;
+        audioContainer.style.display = "block";
+        sessionAudioPlayer.load();
+      } else {
+        audioContainer.style.display = "none";
+        sessionAudioPlayer.src = "";
+      }
     }
 
     activeMeta.textContent = `Active ID: ${s.id}`;
@@ -130,7 +136,7 @@
     const payload = {
       title: sessionTitleInput.value.trim(),
       transcript: editor.innerText.trim(),
-      translation: translationBox.innerText.trim()
+      translation: translationBox.innerText.trim() // إرسال الترجمة للسيرفر
     };
     try {
       showView("Saving…");
@@ -142,7 +148,7 @@
       active.transcript = payload.transcript;
       active.translation = payload.translation;
       renderList();
-      showView("Session updated.", "success");
+      showView("Session updated successfully.", "success");
     } catch (err) { showView(err.message, "error"); }
   }
 
@@ -157,6 +163,7 @@
     URL.revokeObjectURL(url);
   }
 
+  // مستمعات الأحداث
   if (editor) editor.oninput = updateCounts;
   if (translationBox) translationBox.oninput = updateCounts;
   if (refreshBtn) refreshBtn.onclick = loadSessions;
