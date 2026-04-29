@@ -8,6 +8,8 @@
   const sessionTitleInput = document.getElementById("sessionTitleInput");
   const updateSessionBtn = document.getElementById("updateSessionBtn");
   const translateBtn = document.getElementById("translateBtn");
+  const fromLangSelect = document.getElementById("fromLangSelect");
+  const toLangSelect = document.getElementById("toLangSelect");
   const exportTxtBtn = document.getElementById("exportTxtBtn");
   const editor = document.getElementById("editor");
   const translationBox = document.getElementById("translationBox");
@@ -122,7 +124,11 @@
       showView("Translating...", "loading");
       const res = await apiFetch("/api/translate", {
         method: "POST",
-        body: JSON.stringify({ text: text, target: "ar" })
+        body: JSON.stringify({ 
+            text: text, 
+            source: fromLangSelect.value,
+            target: toLangSelect.value 
+        })
       });
       if (res && res.translatedText) {
         translationBox.textContent = res.translatedText;
