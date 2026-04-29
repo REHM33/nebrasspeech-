@@ -11,7 +11,7 @@
     .translation-panel { display: none; }
     .show-translation .translation-panel { display: block; }
     @media (max-width: 768px) { .show-translation { grid-template-columns: 1fr !important; } }
-    .audio-player-container { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #eee; }
+    .audio-player-container { background: #fdfdfd; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
   </style>
 </head>
 <body>
@@ -32,10 +32,11 @@
   <div class="container">
     <section class="page-header">
       <h1>Sessions</h1>
-      <p class="muted">Open, edit, update, and delete your saved sessions.</p>
+      <p class="muted">Manage your transcriptions, translations, and audio files.</p>
     </section>
 
     <section class="sessions-layout">
+      <!-- LEFT: List -->
       <div class="sessions-list-panel">
         <div class="panel-header">
           <h2>Your Sessions</h2>
@@ -49,12 +50,14 @@
         <div id="listMessageBox" class="message-box"></div>
       </div>
 
+      <!-- RIGHT: Editor -->
       <div class="session-viewer-panel">
         <div class="panel-header">
           <h2>Session Editor</h2>
           <span class="muted" id="activeSessionMeta"></span>
         </div>
 
+        <!-- Audio Player Section -->
         <div id="audioContainer" class="audio-player-container" style="display:none;">
           <audio id="sessionAudioPlayer" controls style="width:100%"></audio>
         </div>
@@ -81,31 +84,32 @@
 
         <div class="controls">
           <select id="highlightSelect" class="select">
-            <option value="hl-yellow">Highlight Yellow</option>
-            <option value="hl-blue">Highlight Blue</option>
-            <option value="hl-green">Highlight Green</option>
-            <option value="hl-pink">Highlight Pink</option>
+            <option value="hl-yellow">Yellow</option>
+            <option value="hl-blue">Blue</option>
+            <option value="hl-green">Green</option>
+            <option value="hl-pink">Pink</option>
           </select>
-          <button id="applyHighlightBtn" class="btn-outline" type="button">Apply Highlight</button>
-          <button id="cleanBtn" class="btn-outline" type="button">Clean Text</button>
-          <button id="copyBtn" class="btn-outline" type="button">Copy All</button>
-          <button id="clearTextBtn" class="btn-outline" type="button">Clear Text</button>
+          <button id="applyHighlightBtn" class="btn-outline" type="button">Highlight</button>
+          <button id="cleanBtn" class="btn-outline" type="button">Clean</button>
+          <button id="copyBtn" class="btn-outline" type="button">Copy</button>
+          <button id="clearTextBtn" class="btn-outline" type="button">Clear</button>
         </div>
 
         <div class="controls">
           <input id="findInput" class="input" type="text" placeholder="Find..." />
           <button id="findBtn" class="btn-outline" type="button">Find</button>
-          <button id="findNextBtn" class="btn-outline" type="button">Find Next</button>
+          <button id="findNextBtn" class="btn-outline" type="button">Next</button>
           <button id="clearFindBtn" class="btn-outline" type="button">Clear Find</button>
-          <input id="replaceInput" class="input" type="text" placeholder="Replace with..." />
+          <input id="replaceInput" class="input" type="text" placeholder="Replace..." />
           <button id="replaceOneBtn" class="btn-outline" type="button">Replace One</button>
           <button id="replaceAllBtn" class="btn-outline" type="button">Replace All</button>
         </div>
 
+        <!-- Editors Wrap -->
         <div class="editors-wrap" id="editorsWrap">
           <div>
             <div class="transcript-box">
-              <label class="transcript-label">Original Text</label>
+              <label class="transcript-label">Original Transcription</label>
               <div id="editor" class="rich-editor" contenteditable="true" spellcheck="false"></div>
             </div>
             <div class="controls">
@@ -113,13 +117,15 @@
               <span class="muted" id="charCount">Chars: 0</span>
             </div>
           </div>
+
           <div class="translation-panel" id="translationPanel">
             <div class="transcript-box">
               <label class="transcript-label">Translation</label>
-              <div id="translationBox" class="rich-editor" contenteditable="true" style="background:rgba(255,243,232,0.6);" spellcheck="false"></div>
+              <div id="translationBox" class="rich-editor" contenteditable="true" style="background:rgba(255,243,232,0.4);" spellcheck="false"></div>
             </div>
           </div>
         </div>
+
         <div id="viewerMessageBox" class="message-box"></div>
       </div>
     </section>
