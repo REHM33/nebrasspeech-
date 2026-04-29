@@ -39,20 +39,33 @@
 
   function getToken() {
     try {
-      const a = JSON.parse(localStorage.getItem("nebras_auth") || "null");
-      return a?.access_token || localStorage.getItem("access_token") || null;
-    } catch { return null; }
+      const auth = localStorage.getItem("nebras_auth");
+      if (auth) {
+        const parsed = JSON.parse(auth);
+        return parsed.access_token || parsed.token;
+      }
+      return localStorage.getItem("access_token") || localStorage.getItem("token");
+    } catch (e) {
+      return null;
+    }
   }
 
   async function apiFetch(url, options = {}) {
     const token = getToken();
-    if (!token) location.href = "/login";
+    if (!token) {
+      location.href = "/login";
+      return;
+    }
     const headers = new Headers(options.headers || {});
     headers.set("Authorization", `Bearer ${token}`);
     if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
     const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      location.href = "/login";
+      return;
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
     return data;
@@ -98,12 +111,13 @@
       editorsWrap.classList.remove("show-translation");
     }
 
-    if (s.audio_url || s.file_path || s.audio_path) {
-      let path = s.audio_url || s.file_path || s.audio_path;
-      if (!path.startsWith('http')) {
-        path = window.location.origin + (path.startsWith('/') ? '' : '/') + path;
+    const path = s.audio_url || s.file_path || s.audio_path;
+    if (path) {
+      let fullPath = path;
+      if (!fullPath.startsWith('http')) {
+        fullPath = window.location.origin + (fullPath.startsWith('/') ? '' : '/') + fullPath;
       }
-      audioPlayer.src = path;
+      audioPlayer.src = fullPath;
       audioCont.style.display = "block";
       audioPlayer.load();
     } else {
