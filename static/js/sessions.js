@@ -23,7 +23,6 @@
 
   let sessions = [];
   let active = null;
-  let lastFind = -1;
 
   function showList(text, type = "") {
     if (!listMsg) return;
@@ -89,7 +88,7 @@
   function openSession(s) {
     active = s;
     if (sessionTitleInput) sessionTitleInput.value = s.title || "";
-    if (editor) editor.textContent = s.transcription || s.transcript || "";
+    editor.textContent = s.transcription || s.transcript || "";
     
     if (translationBox) {
       const tText = s.translation || "";
@@ -98,6 +97,23 @@
         editorsWrap.classList.add("show-translation");
       } else {
         editorsWrap.classList.remove("show-translation");
+      }
+    }
+
+    const audioPlayer = document.getElementById("sessionAudioPlayer");
+    const audioCont = document.getElementById("audioContainer");
+    if (audioPlayer) {
+      let path = s.audio_url || s.file_path || s.audio_path;
+      if (path) {
+        if (!path.startsWith('http')) {
+          path = window.location.origin + (path.startsWith('/') ? '' : '/') + path;
+        }
+        audioPlayer.src = path;
+        if(audioCont) audioCont.style.display = "block";
+        audioPlayer.load();
+      } else {
+        if(audioCont) audioCont.style.display = "none";
+        audioPlayer.src = "";
       }
     }
 
@@ -125,9 +141,9 @@
       const res = await apiFetch("/api/translate", {
         method: "POST",
         body: JSON.stringify({ 
-            text: text, 
-            source: fromLangSelect.value,
-            target: toLangSelect.value 
+          text: text, 
+          source: fromLangSelect.value, 
+          target: toLangSelect.value 
         })
       });
       if (res && res.translatedText) {
@@ -155,50 +171,15 @@
       active.transcription = payload.transcription;
       active.translation = payload.translation;
       renderList();
-      showView("Session updated.", "success");
+      showView("Saved!", "success");
     } catch (err) { showView(err.message, "error"); }
   }
 
-  function exportTxt() {
-    if (!active) return;
-    const blob = new Blob([editor.innerText], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${active.title || "session"}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   if (editor) editor.oninput = updateCounts;
-  if (translationBox) translationBox.oninput = updateCounts;
   if (refreshBtn) refreshBtn.onclick = loadSessions;
   if (filterInput) filterInput.oninput = renderList;
   if (updateSessionBtn) updateSessionBtn.onclick = updateSession;
   if (translateBtn) translateBtn.onclick = handleTranslate;
-  if (exportTxtBtn) exportTxtBtn.onclick = exportTxt;
-  
-  document.getElementById("fontMinusBtn").onclick = () => {
-    const cur = parseFloat(getComputedStyle(editor).fontSize);
-    editor.style.fontSize = (cur - 1) + "px";
-  };
-  document.getElementById("fontPlusBtn").onclick = () => {
-    const cur = parseFloat(getComputedStyle(editor).fontSize);
-    editor.style.fontSize = (cur + 1) + "px";
-  };
-  document.getElementById("fontFamilySelect").onchange = (e) => {
-    editor.style.fontFamily = e.target.value === "serif" ? "serif" : e.target.value === "mono" ? "monospace" : "sans-serif";
-  };
-  document.getElementById("alignLeftBtn").onclick = () => editorsWrap.style.textAlign = "left";
-  document.getElementById("alignCenterBtn").onclick = () => editorsWrap.style.textAlign = "center";
-  document.getElementById("alignRightBtn").onclick = () => editorsWrap.style.textAlign = "right";
-  document.getElementById("readingModeBtn").onclick = () => document.body.classList.toggle("reading-mode");
-  document.getElementById("cleanBtn").onclick = () => {
-    editor.textContent = editor.innerText.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
-    updateCounts();
-  };
-  document.getElementById("copyBtn").onclick = () => navigator.clipboard.writeText(editor.innerText);
-  document.getElementById("clearTextBtn").onclick = () => { editor.innerHTML = ""; translationBox.innerHTML = ""; updateCounts(); };
 
   loadSessions();
 })();
