@@ -9,54 +9,31 @@
   const updateSessionBtn = document.getElementById("updateSessionBtn");
   const exportTxtBtn = document.getElementById("exportTxtBtn");
   const editor = document.getElementById("editor");
-  const activeMeta = document.getElementById("activeSessionMeta");
-  const listMsg = document.getElementById("listMessageBox");
-  const viewMsg = document.getElementById("viewerMessageBox");
-  const fontMinusBtn = document.getElementById("fontMinusBtn");
-  const fontPlusBtn = document.getElementById("fontPlusBtn");
-  const fontFamilySelect = document.getElementById("fontFamilySelect");
-  const alignLeftBtn = document.getElementById("alignLeftBtn");
-  const alignCenterBtn = document.getElementById("alignCenterBtn");
-  const alignRightBtn = document.getElementById("alignRightBtn");
-  const readingModeBtn = document.getElementById("readingModeBtn");
-  const highlightSelect = document.getElementById("highlightSelect");
-  const applyHighlightBtn = document.getElementById("applyHighlightBtn");
-  const cleanBtn = document.getElementById("cleanBtn");
-  const copyBtn = document.getElementById("copyBtn");
-  const clearTextBtn = document.getElementById("clearTextBtn");
-  const findInput = document.getElementById("findInput");
-  const replaceInput = document.getElementById("replaceInput");
-  const findBtn = document.getElementById("findBtn");
-  const findNextBtn = document.getElementById("findNextBtn");
-  const clearFindBtn = document.getElementById("clearFindBtn");
-  const replaceOneBtn = document.getElementById("replaceOneBtn");
-  const replaceAllBtn = document.getElementById("replaceAllBtn");
-  const wordCount = document.getElementById("wordCount");
-  const charCount = document.getElementById("charCount");
-
-  const sessionAudioPlayer = document.getElementById("sessionAudioPlayer");
-  const audioContainer = document.getElementById("audioContainer");
   const translationBox = document.getElementById("translationBox");
   const translationPanel = document.getElementById("translationPanel");
   const editorsWrap = document.getElementById("editorsWrap");
+  const activeMeta = document.getElementById("activeSessionMeta");
+  const listMsg = document.getElementById("listMessageBox");
+  const viewMsg = document.getElementById("viewerMessageBox");
+  const sessionAudioPlayer = document.getElementById("sessionAudioPlayer");
+  const audioContainer = document.getElementById("audioContainer");
+  const wordCount = document.getElementById("wordCount");
+  const charCount = document.getElementById("charCount");
 
   let sessions = [];
   let active = null;
-  let reading = false;
   let lastFind = -1;
 
   function showList(text, type = "") {
     if (!listMsg) return;
     listMsg.textContent = text || "";
-    listMsg.className = "message-box";
-    if (type) listMsg.classList.add(type);
+    listMsg.className = "message-box " + type;
   }
 
   function showView(text, type = "") {
     if (!viewMsg) return;
     viewMsg.textContent = text || "";
-    viewMsg.className = "message-box";
-    if (type) viewMsg.classList.add(type);
+    viewMsg.className = "message-box " + type;
   }
 
   function getToken() {
@@ -101,7 +78,7 @@
       const btn = document.createElement("button");
       btn.className = "sessions-item-btn";
       const date = s.created_at ? new Date(s.created_at).toLocaleString() : "";
-      btn.textContent = `${s.title || "Untitled"}${date ? " • " + date : ""}`;
+      btn.textContent = `${s.title || "Untitled"} • ${date}`;
       btn.onclick = () => openSession(s);
       li.appendChild(btn);
       sessionsList.appendChild(li);
@@ -113,24 +90,28 @@
     if (sessionTitleInput) sessionTitleInput.value = s.title || "";
     if (editor) editor.textContent = s.transcript || "";
     
-    if (translationBox && s.translation) {
-      translationBox.textContent = s.translation;
-      editorsWrap.classList.add("show-translation");
-    } else {
-      translationBox.textContent = "";
-      editorsWrap.classList.remove("show-translation");
+    if (translationBox) {
+      const tText = s.translation || "";
+      translationBox.textContent = tText;
+      if (tText.trim() !== "") {
+        editorsWrap.classList.add("show-translation");
+      } else {
+        editorsWrap.classList.remove("show-translation");
+      }
     }
 
-    if (sessionAudioPlayer && s.audio_url) {
-      sessionAudioPlayer.src = s.audio_url;
+    if (sessionAudioPlayer && (s.audio_url || s.file_path)) {
+      const path = s.audio_url || s.file_path;
+      sessionAudioPlayer.src = path.startsWith('http') ? path : `/${path}`;
       audioContainer.style.display = "block";
+      sessionAudioPlayer.load();
     } else {
       audioContainer.style.display = "none";
     }
 
     activeMeta.textContent = `Active ID: ${s.id}`;
-    exportTxtBtn.disabled = false;
     updateSessionBtn.disabled = false;
+    exportTxtBtn.disabled = false;
     updateCounts();
     showView("");
   }
@@ -161,7 +142,7 @@
       active.transcript = payload.transcript;
       active.translation = payload.translation;
       renderList();
-      showView("Updated.", "success");
+      showView("Session updated.", "success");
     } catch (err) { showView(err.message, "error"); }
   }
 
@@ -176,48 +157,34 @@
     URL.revokeObjectURL(url);
   }
 
-  function setFontSize(delta) {
-    const cur = parseFloat(getComputedStyle(editor).fontSize);
-    editor.style.fontSize = `${Math.min(28, Math.max(12, cur + delta))}px`;
-  }
-
-  function setFontFamily(v) {
-    editor.style.fontFamily = v === "serif" ? "serif" : v === "mono" ? "monospace" : "sans-serif";
-  }
-
-  function cleanText() {
-    editor.textContent = editor.innerText.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
-    updateCounts();
-  }
-
-  function findText(next) {
-    const q = findInput.value.trim().toLowerCase();
-    if (!q) return;
-    const idx = editor.innerText.toLowerCase().indexOf(q, next ? lastFind + 1 : 0);
-    if (idx === -1) { lastFind = -1; showView("Not found", "error"); return; }
-    lastFind = idx;
-    showView(`Found at ${idx + 1}`, "success");
-  }
-
   if (editor) editor.oninput = updateCounts;
   if (translationBox) translationBox.oninput = updateCounts;
   if (refreshBtn) refreshBtn.onclick = loadSessions;
   if (filterInput) filterInput.oninput = renderList;
   if (updateSessionBtn) updateSessionBtn.onclick = updateSession;
   if (exportTxtBtn) exportTxtBtn.onclick = exportTxt;
-  if (fontMinusBtn) fontMinusBtn.onclick = () => setFontSize(-1);
-  if (fontPlusBtn) fontPlusBtn.onclick = () => setFontSize(1);
-  if (fontFamilySelect) fontFamilySelect.onchange = () => setFontFamily(fontFamilySelect.value);
-  if (alignLeftBtn) alignLeftBtn.onclick = () => editor.style.textAlign = "left";
-  if (alignCenterBtn) alignCenterBtn.onclick = () => editor.style.textAlign = "center";
-  if (alignRightBtn) alignRightBtn.onclick = () => editor.style.textAlign = "right";
-  if (readingModeBtn) readingModeBtn.onclick = () => document.body.classList.toggle("reading-mode");
-  if (cleanBtn) cleanBtn.onclick = cleanText;
-  if (copyBtn) copyBtn.onclick = () => navigator.clipboard.writeText(editor.innerText);
-  if (clearTextBtn) clearTextBtn.onclick = () => { editor.innerHTML = ""; updateCounts(); };
-  if (findBtn) findBtn.onclick = () => findText(false);
-  if (findNextBtn) findNextBtn.onclick = () => findText(true);
-  if (clearFindBtn) clearFindBtn.onclick = () => { findInput.value = ""; lastFind = -1; };
+  
+  document.getElementById("fontMinusBtn").onclick = () => {
+    const cur = parseFloat(getComputedStyle(editor).fontSize);
+    editor.style.fontSize = (cur - 1) + "px";
+  };
+  document.getElementById("fontPlusBtn").onclick = () => {
+    const cur = parseFloat(getComputedStyle(editor).fontSize);
+    editor.style.fontSize = (cur + 1) + "px";
+  };
+  document.getElementById("fontFamilySelect").onchange = (e) => {
+    editor.style.fontFamily = e.target.value === "serif" ? "serif" : e.target.value === "mono" ? "monospace" : "sans-serif";
+  };
+  document.getElementById("alignLeftBtn").onclick = () => editor.style.textAlign = "left";
+  document.getElementById("alignCenterBtn").onclick = () => editor.style.textAlign = "center";
+  document.getElementById("alignRightBtn").onclick = () => editor.style.textAlign = "right";
+  document.getElementById("readingModeBtn").onclick = () => document.body.classList.toggle("reading-mode");
+  document.getElementById("cleanBtn").onclick = () => {
+    editor.textContent = editor.innerText.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+    updateCounts();
+  };
+  document.getElementById("copyBtn").onclick = () => navigator.clipboard.writeText(editor.innerText);
+  document.getElementById("clearTextBtn").onclick = () => { editor.innerHTML = ""; updateCounts(); };
 
   loadSessions();
 })();
