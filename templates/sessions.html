@@ -4,15 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nebras | Sessions</title>
+  <meta name="description" content="Manage your saved transcription sessions." />
   <link rel="stylesheet" href="css/style.css" />
-  <style>
-    .editors-wrap { display: grid; grid-template-columns: 1fr; gap: 16px; transition: all 0.3s ease; }
-    .show-translation { grid-template-columns: 1fr 1fr !important; }
-    .translation-panel { display: none; }
-    .show-translation .translation-panel { display: block; }
-    @media (max-width: 768px) { .show-translation { grid-template-columns: 1fr !important; } }
-    .audio-player-container { background: #fdfdfd; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-  </style>
 </head>
 <body>
 
@@ -30,36 +23,36 @@
 
 <main class="sessions-page">
   <div class="container">
+
     <section class="page-header">
       <h1>Sessions</h1>
-      <p class="muted">Manage your transcriptions, translations, and audio files.</p>
+      <p class="muted">Open, edit, update, and delete your saved sessions.</p>
     </section>
 
     <section class="sessions-layout">
+
       <!-- LEFT: List -->
       <div class="sessions-list-panel">
         <div class="panel-header">
           <h2>Your Sessions</h2>
           <button id="refreshBtn" class="btn-outline" type="button">Refresh</button>
         </div>
+
         <div class="controls">
           <input id="filterInput" class="input" type="text" placeholder="Filter by title..." />
           <button id="clearFilterBtn" class="btn-outline" type="button">Clear</button>
         </div>
-        <ul id="sessionsList" class="sessions-list"></ul>
-        <div id="listMessageBox" class="message-box"></div>
+
+        <ul id="sessionsList" class="sessions-list" aria-label="Sessions list"></ul>
+
+        <div id="listMessageBox" class="message-box" role="status" aria-live="polite"></div>
       </div>
 
-      <!-- RIGHT: Editor -->
+      <!-- RIGHT: Viewer/Editor -->
       <div class="session-viewer-panel">
         <div class="panel-header">
           <h2>Session Editor</h2>
           <span class="muted" id="activeSessionMeta"></span>
-        </div>
-
-        <!-- Audio Player Section -->
-        <div id="audioContainer" class="audio-player-container" style="display:none;">
-          <audio id="sessionAudioPlayer" controls style="width:100%"></audio>
         </div>
 
         <div class="controls">
@@ -71,63 +64,62 @@
         <div class="controls">
           <button id="fontMinusBtn" class="btn-outline" type="button">A-</button>
           <button id="fontPlusBtn" class="btn-outline" type="button">A+</button>
+
+          <label class="sr-only" for="fontFamilySelect">Font Family</label>
           <select id="fontFamilySelect" class="select">
             <option value="sans">Sans</option>
             <option value="serif">Serif</option>
             <option value="mono">Mono</option>
           </select>
+
           <button id="alignLeftBtn" class="btn-outline" type="button">Left</button>
           <button id="alignCenterBtn" class="btn-outline" type="button">Center</button>
           <button id="alignRightBtn" class="btn-outline" type="button">Right</button>
+
           <button id="readingModeBtn" class="btn-outline" type="button">Reading Mode</button>
         </div>
 
         <div class="controls">
+          <label class="sr-only" for="highlightSelect">Highlight Color</label>
           <select id="highlightSelect" class="select">
-            <option value="hl-yellow">Yellow</option>
-            <option value="hl-blue">Blue</option>
-            <option value="hl-green">Green</option>
-            <option value="hl-pink">Pink</option>
+            <option value="hl-yellow">Highlight Yellow</option>
+            <option value="hl-blue">Highlight Blue</option>
+            <option value="hl-green">Highlight Green</option>
+            <option value="hl-pink">Highlight Pink</option>
           </select>
-          <button id="applyHighlightBtn" class="btn-outline" type="button">Highlight</button>
-          <button id="cleanBtn" class="btn-outline" type="button">Clean</button>
-          <button id="copyBtn" class="btn-outline" type="button">Copy</button>
-          <button id="clearTextBtn" class="btn-outline" type="button">Clear</button>
+          <button id="applyHighlightBtn" class="btn-outline" type="button">Apply Highlight</button>
+
+          <button id="cleanBtn" class="btn-outline" type="button">Clean Text</button>
+          <button id="copyBtn" class="btn-outline" type="button">Copy All</button>
+          <button id="clearTextBtn" class="btn-outline" type="button">Clear Text</button>
         </div>
 
         <div class="controls">
+          <label class="sr-only" for="findInput">Find</label>
           <input id="findInput" class="input" type="text" placeholder="Find..." />
-          <button id="findBtn" class="btn-outline" type="button">Find</button>
-          <button id="findNextBtn" class="btn-outline" type="button">Next</button>
+          <button id="findBtn" class="btn-outline" type="button">Find</button><button id="findNextBtn" class="btn-outline" type="button">Find Next</button>
           <button id="clearFindBtn" class="btn-outline" type="button">Clear Find</button>
-          <input id="replaceInput" class="input" type="text" placeholder="Replace..." />
+
+          <label class="sr-only" for="replaceInput">Replace With</label>
+          <input id="replaceInput" class="input" type="text" placeholder="Replace with..." />
+
           <button id="replaceOneBtn" class="btn-outline" type="button">Replace One</button>
           <button id="replaceAllBtn" class="btn-outline" type="button">Replace All</button>
         </div>
 
-        <!-- Editors Wrap -->
-        <div class="editors-wrap" id="editorsWrap">
-          <div>
-            <div class="transcript-box">
-              <label class="transcript-label">Original Transcription</label>
-              <div id="editor" class="rich-editor" contenteditable="true" spellcheck="false"></div>
-            </div>
-            <div class="controls">
-              <span class="muted" id="wordCount">Words: 0</span>
-              <span class="muted" id="charCount">Chars: 0</span>
-            </div>
-          </div>
-
-          <div class="translation-panel" id="translationPanel">
-            <div class="transcript-box">
-              <label class="transcript-label">Translation</label>
-              <div id="translationBox" class="rich-editor" contenteditable="true" style="background:rgba(255,243,232,0.4);" spellcheck="false"></div>
-            </div>
-          </div>
+        <div class="transcript-box">
+          <label class="transcript-label" for="editor">Editor</label>
+          <div id="editor" class="rich-editor" contenteditable="true" spellcheck="false"></div>
         </div>
 
-        <div id="viewerMessageBox" class="message-box"></div>
+        <div class="controls">
+          <span class="muted" id="wordCount">Words: 0</span>
+          <span class="muted" id="charCount">Chars: 0</span>
+        </div>
+
+        <div id="viewerMessageBox" class="message-box" role="status" aria-live="polite"></div>
       </div>
+
     </section>
   </div>
 </main>
