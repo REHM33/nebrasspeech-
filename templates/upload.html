@@ -4,10 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nebras | Upload</title>
-  <meta name="description" content="Upload audio and work with transcripts in a structured editor." />
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    /* تنسيق تقسيم الشاشة للترجمة */
     .editors-wrap {
       display: grid;
       grid-template-columns: 1fr;
@@ -57,10 +55,8 @@
       <div class="status-bar">
         <span class="status-label">Status:</span>
         <span id="statusPill" class="status-pill">Ready</span>
-        <span class="muted" id="autosavePill"></span>
       </div>
 
-      <!-- Upload audio -->
       <div class="controls">
         <input id="audioFileInput" class="input" type="file" accept="audio/*" />
         <button id="clearAudioBtn" class="btn-outline" type="button">Clear Audio</button>
@@ -72,7 +68,6 @@
         <audio id="audioPlayer" controls></audio>
       </div>
 
-      <!-- Editor Tools Row 1 -->
       <div class="controls">
         <button id="fontMinusBtn" class="btn-outline" type="button">A-</button>
         <button id="fontPlusBtn" class="btn-outline" type="button">A+</button>
@@ -87,7 +82,6 @@
         <button id="readingModeBtn" class="btn-outline" type="button">Reading Mode</button>
       </div>
 
-      <!-- Editor Tools Row 2 -->
       <div class="controls">
         <select id="highlightSelect" class="select">
           <option value="hl-yellow">Highlight Yellow</option>
@@ -102,7 +96,6 @@
         <button id="clearTextBtn" class="btn-outline" type="button">Clear Text</button>
       </div>
 
-      <!-- Search / Replace -->
       <div class="controls">
         <input id="findInput" class="input" type="text" placeholder="Find..." />
         <button id="findBtn" class="btn-outline" type="button">Find</button>
@@ -113,11 +106,18 @@
         <button id="replaceAllBtn" class="btn-outline" type="button">Replace All</button>
       </div>
 
-      <!-- Translate Row -->
       <div class="controls">
+        <select id="sourceLangSelect" class="select">
+          <option value="ar">From Arabic</option>
+          <option value="en">From English</option>
+          <option value="fr">From French</option>
+          <option value="es">From Spanish</option>
+          <option value="de">From German</option>
+          <option value="tr">From Turkish</option>
+        </select>
         <select id="translateLangSelect" class="select">
-          <option value="ar">→ Arabic</option>
           <option value="en">→ English</option>
+          <option value="ar">→ Arabic</option>
           <option value="fr">→ French</option>
           <option value="es">→ Spanish</option>
           <option value="de">→ German</option>
@@ -126,12 +126,10 @@
         <button id="translateBtn" class="btn-outline" type="button">Translate</button>
       </div>
 
-      <!-- Editors Side by Side -->
       <div class="editors-wrap" id="editorsWrap">
-        <!-- Original -->
         <div>
           <div class="transcript-box">
-            <label class="transcript-label" for="editor">Original Text</label>
+            <label class="transcript-label">Original Text</label>
             <div id="editor" class="rich-editor" contenteditable="true" spellcheck="false"></div>
           </div>
           <div class="controls">
@@ -140,7 +138,6 @@
           </div>
         </div>
 
-        <!-- Translation Panel -->
         <div class="translation-panel">
           <div class="transcript-box">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
