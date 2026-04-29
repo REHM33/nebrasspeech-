@@ -22,7 +22,6 @@
 
   let sessions = [];
   let active = null;
-  let lastFind = -1;
 
   function showList(text, type = "") {
     if (!listMsg) return;
@@ -88,25 +87,27 @@
   function openSession(s) {
     active = s;
     if (sessionTitleInput) sessionTitleInput.value = s.title || "";
-    if (editor) editor.textContent = s.transcript || "";
+    if (editor) editor.textContent = s.transcription || s.transcript || "";
     
-    // إظهار الترجمة
+    // حل مشكلة الترجمة
     if (translationBox) {
       const tText = s.translation || "";
       translationBox.textContent = tText;
-      if (tText.trim() !== "") {
-        editorsWrap.classList.add("show-translation");
-      } else {
-        editorsWrap.classList.remove("show-translation");
-      }
+      // إظهار لوحة الترجمة دائماً عند فتح الجلسة لتتمكن من الكتابة فيها
+      translationPanel.style.display = "block";
+      editorsWrap.classList.add("show-translation");
     }
 
-    // إظهار الصوت ومعالجة المسار
+    // حل مشكلة الصوت - ERR_NAME_NOT_RESOLVED
     if (sessionAudioPlayer) {
-      const path = s.audio_url || s.file_path;
+      let path = s.audio_url || s.file_path || "";
       if (path) {
-        // إذا كان المسار لا يبدأ بـ http، نفترض أنه مخزن محلياً على السيرفر
-        sessionAudioPlayer.src = path.startsWith('http') ? path : `/${path}`;
+        // إذا كان الرابط يبدأ بـ http، نتأكد أنه لا يحتوي على أخطاء في الـ Domain
+        // إذا كان مجرد مسار (مثل uploads/file.mp3)، نربطه بالدومين الحالي
+        if (!path.startsWith('http')) {
+            path = window.location.origin + (path.startsWith('/') ? '' : '/') + path;
+        }
+        sessionAudioPlayer.src = path;
         audioContainer.style.display = "block";
         sessionAudioPlayer.load();
       } else {
@@ -133,28 +134,37 @@
 
   async function updateSession() {
     if (!active) return;
+    
+    // التأكد من جلب النصوص من الـ ContentEditable
     const payload = {
       title: sessionTitleInput.value.trim(),
-      transcript: editor.innerText.trim(),
-      translation: translationBox.innerText.trim() // إرسال الترجمة للسيرفر
+      transcription: editor.innerText.trim(),
+      translation: translationBox.innerText.trim()
     };
+
     try {
-      showView("Saving…");
+      showView("Saving…", "loading");
       await apiFetch(`/api/sessions/${active.id}`, {
         method: "PUT",
         body: JSON.stringify(payload)
       });
+      
+      // تحديث البيانات محلياً
       active.title = payload.title;
-      active.transcript = payload.transcript;
+      active.transcription = payload.transcription;
       active.translation = payload.translation;
+      
       renderList();
-      showView("Session updated successfully.", "success");
-    } catch (err) { showView(err.message, "error"); }
+      showView("Saved successfully!", "success");
+    } catch (err) { 
+      showView("Save failed: " + err.message, "error"); 
+    }
   }
 
   function exportTxt() {
     if (!active) return;
-    const blob = new Blob([editor.innerText], { type: "text/plain" });
+    const content = `Title: ${active.title}\n\nOriginal:\n${editor.innerText}\n\nTranslation:\n${translationBox.innerText}`;
+    const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -163,7 +173,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // مستمعات الأحداث
+  // Event Listeners
   if (editor) editor.oninput = updateCounts;
   if (translationBox) translationBox.oninput = updateCounts;
   if (refreshBtn) refreshBtn.onclick = loadSessions;
@@ -171,6 +181,7 @@
   if (updateSessionBtn) updateSessionBtn.onclick = updateSession;
   if (exportTxtBtn) exportTxtBtn.onclick = exportTxt;
   
+  // Font/UI Controls
   document.getElementById("fontMinusBtn").onclick = () => {
     const cur = parseFloat(getComputedStyle(editor).fontSize);
     editor.style.fontSize = (cur - 1) + "px";
@@ -180,18 +191,22 @@
     editor.style.fontSize = (cur + 1) + "px";
   };
   document.getElementById("fontFamilySelect").onchange = (e) => {
-    editor.style.fontFamily = e.target.value === "serif" ? "serif" : e.target.value === "mono" ? "monospace" : "sans-serif";
+    const f = e.target.value === "serif" ? "serif" : e.target.value === "mono" ? "monospace" : "sans-serif";
+    editor.style.fontFamily = f;
+    translationBox.style.fontFamily = f;
   };
-  document.getElementById("alignLeftBtn").onclick = () => editor.style.textAlign = "left";
-  document.getElementById("alignCenterBtn").onclick = () => editor.style.textAlign = "center";
-  document.getElementById("alignRightBtn").onclick = () => editor.style.textAlign = "right";
+  document.getElementById("alignLeftBtn").onclick = () => editorsWrap.style.textAlign = "left";
+  document.getElementById("alignCenterBtn").onclick = () => editorsWrap.style.textAlign = "center";
+  document.getElementById("alignRightBtn").onclick = () => editorsWrap.style.textAlign = "right";
   document.getElementById("readingModeBtn").onclick = () => document.body.classList.toggle("reading-mode");
   document.getElementById("cleanBtn").onclick = () => {
     editor.textContent = editor.innerText.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
     updateCounts();
   };
-  document.getElementById("copyBtn").onclick = () => navigator.clipboard.writeText(editor.innerText);
-  document.getElementById("clearTextBtn").onclick = () => { editor.innerHTML = ""; updateCounts(); };
+  document.getElementById("copyBtn").onclick = () => navigator.clipboard.writeText(editor.innerText + "\n\n" + translationBox.innerText);
+  document.getElementById("clearTextBtn").onclick = () => { 
+      if(confirm("Clear everything?")) { editor.innerHTML = ""; translationBox.innerHTML = ""; updateCounts(); }
+  };
 
   loadSessions();
 })();
