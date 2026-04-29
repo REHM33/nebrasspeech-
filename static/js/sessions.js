@@ -13,13 +13,14 @@
   const exportTxtBtn = document.getElementById("exportTxtBtn");
   const editor = document.getElementById("editor");
   const translationBox = document.getElementById("translationBox");
-  const translationPanel = document.getElementById("translationPanel");
   const editorsWrap = document.getElementById("editorsWrap");
   const activeMeta = document.getElementById("activeSessionMeta");
   const listMsg = document.getElementById("listMessageBox");
   const viewMsg = document.getElementById("viewerMessageBox");
   const wordCount = document.getElementById("wordCount");
   const charCount = document.getElementById("charCount");
+  const audioPlayer = document.getElementById("sessionAudioPlayer");
+  const audioCont = document.getElementById("audioContainer");
 
   let sessions = [];
   let active = null;
@@ -39,9 +40,8 @@
   function getToken() {
     try {
       const a = JSON.parse(localStorage.getItem("nebras_auth") || "null");
-      if (a && a.access_token) return a.access_token;
-    } catch {}
-    return localStorage.getItem("nebras_token") || localStorage.getItem("access_token") || null;
+      return a?.access_token || localStorage.getItem("access_token") || null;
+    } catch { return null; }
   }
 
   async function apiFetch(url, options = {}) {
@@ -87,34 +87,28 @@
 
   function openSession(s) {
     active = s;
-    if (sessionTitleInput) sessionTitleInput.value = s.title || "";
+    sessionTitleInput.value = s.title || "";
     editor.textContent = s.transcription || s.transcript || "";
     
-    if (translationBox) {
-      const tText = s.translation || "";
-      translationBox.textContent = tText;
-      if (tText.trim() !== "") {
-        editorsWrap.classList.add("show-translation");
-      } else {
-        editorsWrap.classList.remove("show-translation");
-      }
+    const tText = s.translation || "";
+    translationBox.textContent = tText;
+    if (tText.trim() !== "") {
+      editorsWrap.classList.add("show-translation");
+    } else {
+      editorsWrap.classList.remove("show-translation");
     }
 
-    const audioPlayer = document.getElementById("sessionAudioPlayer");
-    const audioCont = document.getElementById("audioContainer");
-    if (audioPlayer) {
+    if (s.audio_url || s.file_path || s.audio_path) {
       let path = s.audio_url || s.file_path || s.audio_path;
-      if (path) {
-        if (!path.startsWith('http')) {
-          path = window.location.origin + (path.startsWith('/') ? '' : '/') + path;
-        }
-        audioPlayer.src = path;
-        if(audioCont) audioCont.style.display = "block";
-        audioPlayer.load();
-      } else {
-        if(audioCont) audioCont.style.display = "none";
-        audioPlayer.src = "";
+      if (!path.startsWith('http')) {
+        path = window.location.origin + (path.startsWith('/') ? '' : '/') + path;
       }
+      audioPlayer.src = path;
+      audioCont.style.display = "block";
+      audioPlayer.load();
+    } else {
+      audioCont.style.display = "none";
+      audioPlayer.src = "";
     }
 
     activeMeta.textContent = `Active ID: ${s.id}`;
@@ -134,7 +128,7 @@
   }
 
   async function handleTranslate() {
-    const text = (editor?.innerText || "").trim();
+    const text = editor.innerText.trim();
     if (!text) return showView("No text to translate.", "error");
     try {
       showView("Translating...", "loading");
@@ -159,7 +153,8 @@
     const payload = {
       title: sessionTitleInput.value.trim(),
       transcription: editor.innerText.trim(),
-      translation: translationBox.innerText.trim()
+      translation: translationBox.innerText.trim(),
+      audio_url: audioPlayer.src
     };
     try {
       showView("Saving…");
@@ -170,9 +165,19 @@
       active.title = payload.title;
       active.transcription = payload.transcription;
       active.translation = payload.translation;
+      active.audio_url = payload.audio_url;
       renderList();
       showView("Saved!", "success");
     } catch (err) { showView(err.message, "error"); }
+  }
+
+  function exportTxt() {
+    if (!active) return;
+    const blob = new Blob([editor.innerText], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${active.title || "session"}.txt`;
+    a.click(); URL.revokeObjectURL(url);
   }
 
   if (editor) editor.oninput = updateCounts;
@@ -180,6 +185,28 @@
   if (filterInput) filterInput.oninput = renderList;
   if (updateSessionBtn) updateSessionBtn.onclick = updateSession;
   if (translateBtn) translateBtn.onclick = handleTranslate;
+  if (exportTxtBtn) exportTxtBtn.onclick = exportTxt;
+
+  document.getElementById("fontMinusBtn").onclick = () => {
+    const cur = parseFloat(getComputedStyle(editor).fontSize);
+    editor.style.fontSize = (cur - 1) + "px";
+  };
+  document.getElementById("fontPlusBtn").onclick = () => {
+    const cur = parseFloat(getComputedStyle(editor).fontSize);
+    editor.style.fontSize = (cur + 1) + "px";
+  };
+  document.getElementById("fontFamilySelect").onchange = (e) => {
+    editor.style.fontFamily = e.target.value === "serif" ? "serif" : e.target.value === "mono" ? "monospace" : "sans-serif";
+  };
+  document.getElementById("alignLeftBtn").onclick = () => editorsWrap.style.textAlign = "left";
+  document.getElementById("alignCenterBtn").onclick = () => editorsWrap.style.textAlign = "center";
+  document.getElementById("alignRightBtn").onclick = () => editorsWrap.style.textAlign = "right";
+  document.getElementById("cleanBtn").onclick = () => {
+    editor.textContent = editor.innerText.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+    updateCounts();
+  };
+  document.getElementById("copyBtn").onclick = () => navigator.clipboard.writeText(editor.innerText);
+  document.getElementById("clearTextBtn").onclick = () => { editor.innerHTML = ""; translationBox.innerHTML = ""; updateCounts(); };
 
   loadSessions();
 })();
