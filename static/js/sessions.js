@@ -16,8 +16,6 @@
   const activeMeta = document.getElementById("activeSessionMeta");
   const listMsg = document.getElementById("listMessageBox");
   const viewMsg = document.getElementById("viewerMessageBox");
-  const sessionAudioPlayer = document.getElementById("sessionAudioPlayer");
-  const audioContainer = document.getElementById("audioContainer");
   const wordCount = document.getElementById("wordCount");
   const charCount = document.getElementById("charCount");
 
@@ -95,26 +93,9 @@
       const tText = s.translation || "";
       translationBox.textContent = tText;
       if (tText.trim() !== "") {
-        translationPanel.style.display = "block";
         editorsWrap.classList.add("show-translation");
       } else {
-        translationPanel.style.display = "none";
         editorsWrap.classList.remove("show-translation");
-      }
-    }
-
-    if (sessionAudioPlayer) {
-      let path = s.audio_url || s.file_path || "";
-      if (path) {
-        if (!path.startsWith('http')) {
-            path = window.location.origin + (path.startsWith('/') ? '' : '/') + path;
-        }
-        sessionAudioPlayer.src = path;
-        audioContainer.style.display = "block";
-        sessionAudioPlayer.load();
-      } else {
-        audioContainer.style.display = "none";
-        sessionAudioPlayer.src = "";
       }
     }
 
@@ -145,7 +126,6 @@
       });
       if (res && res.translatedText) {
         translationBox.textContent = res.translatedText;
-        translationPanel.style.display = "block";
         editorsWrap.classList.add("show-translation");
         showView("Translated successfully!", "success");
       }
