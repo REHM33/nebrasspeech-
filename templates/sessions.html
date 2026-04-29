@@ -11,7 +11,6 @@
     .translation-panel { display: none; }
     .show-translation .translation-panel { display: block; }
     @media (max-width: 768px) { .show-translation { grid-template-columns: 1fr !important; } }
-    .audio-player-container { background: #fdfdfd; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #eee; }
   </style>
 </head>
 <body>
@@ -32,7 +31,7 @@
   <div class="container">
     <section class="page-header">
       <h1>Sessions</h1>
-      <p class="muted">Manage your transcriptions, translations, and audio files.</p>
+      <p class="muted">Manage your transcriptions and translations.</p>
     </section>
 
     <section class="sessions-layout">
@@ -53,10 +52,6 @@
         <div class="panel-header">
           <h2>Session Editor</h2>
           <span class="muted" id="activeSessionMeta"></span>
-        </div>
-
-        <div id="audioContainer" class="audio-player-container" style="display:none;">
-          <audio id="sessionAudioPlayer" controls style="width:100%"></audio>
         </div>
 
         <div class="controls">
