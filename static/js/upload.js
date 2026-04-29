@@ -36,8 +36,8 @@
   const replaceOneBtn = document.getElementById("replaceOneBtn");
   const replaceAllBtn = document.getElementById("replaceAllBtn");
 
-  // Translation Elements
   const translateBtn = document.getElementById("translateBtn");
+  const sourceLangSelect = document.getElementById("sourceLangSelect");
   const translateLangSelect = document.getElementById("translateLangSelect");
   const translationBox = document.getElementById("translationBox");
   const copyTranslationBtn = document.getElementById("copyTranslationBtn");
@@ -112,11 +112,12 @@
   async function translateText() {
     const text = (editor?.innerText || "").trim();
     if (!text) { show("No text to translate.", "error"); return; }
-    const targetLang = translateLangSelect?.value || "ar";
+    const sourceLang = sourceLangSelect?.value || "ar";
+    const targetLang = translateLangSelect?.value || "en";
     setStatus("Translating…");
     show("Translating…");
     try {
-      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|${targetLang}`);
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`);
       const data = await res.json();
       if (data && data.responseData && data.responseData.translatedText) {
         if (translationBox) translationBox.textContent = data.responseData.translatedText;
@@ -243,7 +244,6 @@
     document.body.classList.toggle("reading-mode", reading);
   }
 
-  // Event Listeners
   if (editor) editor.addEventListener("input", updateCounts);
   if (audioInput) {
     audioInput.addEventListener("change", () => {
